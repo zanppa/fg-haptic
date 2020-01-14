@@ -213,7 +213,7 @@ var run_test_mode = func(path) {
   var z = 0.0;
   var shaker = 0;
 
-  var stick_force_path = path.getNode("stick-force");
+  var pilot_force_path = path.getNode("pilot");
 
   if(test_duration < 10)
   {
@@ -222,7 +222,7 @@ var run_test_mode = func(path) {
     y = math.cos(3.14159*test_duration/5.0);
     z = math.sin(3.14159*test_duration/5.0);
   }
-  else if(test_duration < 16)
+  else if(test_duration < 12)
   {
     # Test stick shaker
     shaker = 1;
@@ -234,10 +234,10 @@ var run_test_mode = func(path) {
   }
 
   # Set parameters
-  if(stick_force_path != nil) {
-    stick_force_path.getNode("aileron").setValue(x);
-    stick_force_path.getNode("elevator").setValue(y);
-    stick_force_path.getNode("rudder").setValue(z);
+  if(pilot_force_path != nil) {
+    pilot_force_path.getNode("x").setValue(x);
+    pilot_force_path.getNode("y").setValue(y);
+    pilot_force_path.getNode("z").setValue(z);
   }
   setprop("/haptic/stick-shaker/trigger", shaker);
 
