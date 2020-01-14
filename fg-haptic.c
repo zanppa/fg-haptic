@@ -54,12 +54,16 @@ const char axes[AXES] = { 'x', 'y', 'z' };
 
 //void init_sockaddr(struct sockaddr_in *name, const char *hostname, unsigned port);
 TCPsocket fgfsconnect(const Uint32 host, const Uint16 port);
+UDPsocket fgfs_udp_reader(const Uint16 port);
+Uint32 fgfs_wait_packet(UDPsocket socket);
 int fgfswrite(TCPsocket sock, char *msg, ...);
 const char *fgfsread(TCPsocket sock, int wait);
 void fgfsflush(TCPsocket sock);
 
 // Socket used to communicate with flightgear
-TCPsocket telnet_sock, server_sock, client_sock;
+TCPsocket telnet_sock;
+UDPsocket server_sock;
+IPaddress *client_addr;
 SDLNet_SocketSet socketset;
 
 // Effect struct definitions, used to store parameters
@@ -421,7 +425,7 @@ void read_devices(void)
 	} while (read == 1 && idata == 1);
 	printf("Done\n");
 
-	fgfsflush(client_sock);	// Get rid of FF data that was received during reinitialization
+	//fgfsflush(client_sock);	// Get rid of FF data that was received during reinitialization
 
 	return;
 }
@@ -584,12 +588,23 @@ void reload_effect(hapticDevice * device, SDL_HapticEffect * effect, int *effect
 			printf("Run error: %s\n", SDL_GetError());
 }
 
+static UDPpacket *fg_packet = NULL;
+
 void read_fg(void)
 {
 	int reconf, read;
 	const char *p;
 
-	p = fgfsread(client_sock, TIMEOUT);
+	if(!fg_packet)
+		fg_packet = SDLNet_AllocPacket(512);
+	if(!fg_packet)
+		return;
+
+	//p = fgfsread(client_sock, TIMEOUT);
+	if(SDLNet_UDP_Recv(server_sock, fg_packet) < 1)
+		return;	// No data received
+
+	p = (char *)fg_packet->data;
 	if (!p)
 		return;		// Null pointer, read failed
 
@@ -695,7 +710,7 @@ int main(int argc, char **argv)
 	unsigned int runtime = 0;
 	unsigned int dt = 0;
 	bool test_mode = false;
-	IPaddress *fgfs_address;
+	Uint32 fgfs_address;
 	bool start_effects = true;
 
 	// Handlers for ctrl+c etc quitting methods
@@ -749,25 +764,29 @@ int main(int argc, char **argv)
 	}
 	// Wait for a connection from flightgear generic io
 	printf("\n\nWaiting for flightgear generic IO at port %d, please run Flight Gear now!\n", DFLTPORT + 1);
-	server_sock = fgfsconnect(0, DFLTPORT + 1);
+	server_sock = fgfs_udp_reader(DFLTPORT + 1);
 	if (!server_sock) {
-		printf("Failed to connect!\n");
+		printf("Failed to create UDP server!\n");
 		abort_execution(-1);
 	}
 
-	fgfs_address = SDLNet_TCP_GetPeerAddress(client_sock);
+	fgfs_address = fgfs_wait_packet(server_sock);
+	if(!fgfs_address) {
+		printf("Could not determine fgfs address!\n");
+		abort_execution(-1);
+	}
 	printf("Got connection, sending haptic details through telnet\n");
-	printf("Host: %d.%d.%d.%d Port: %d\n", fgfs_address->host & 0xFF, (fgfs_address->host >> 8) & 0xFF, 
-		(fgfs_address->host >> 16) & 0xFF, (fgfs_address->host >> 24) & 0xFF, DFLTPORT);
+	printf("Host: %d.%d.%d.%d Port: %d\n", fgfs_address & 0xFF, (fgfs_address >> 8) & 0xFF, 
+		(fgfs_address >> 16) & 0xFF, (fgfs_address >> 24) & 0xFF, DFLTPORT);
 
 	// Connect to flightgear using telnet
-	telnet_sock = fgfsconnect(fgfs_address->host, DFLTPORT);
+	telnet_sock = fgfsconnect(fgfs_address, DFLTPORT);
 	if (!telnet_sock) {
 		printf("Could not connect to flightgear with telnet!\n");
 		abort_execution(-1);
 	}
 	// Add sockets to a socket set for polling/selecting
-	SDLNet_TCP_AddSocket(socketset, client_sock);
+	//SDLNet_TCP_AddSocket(socketset, client_sock);
 	SDLNet_TCP_AddSocket(socketset, telnet_sock);
 
 	// Switch to data mode
@@ -920,8 +939,9 @@ int main(int argc, char **argv)
 	fgfsclose(telnet_sock);
 
 	// Close generic connection
-	fgfsclose(client_sock);
-	fgfsclose(server_sock);
+	//fgfsclose(client_sock);
+	//fgfsclose(server_sock);
+	SDLNet_UDP_Close(server_sock);
 
 	SDLNet_FreeSocketSet(socketset);
 
@@ -954,9 +974,14 @@ void abort_execution(int signal)
 	fgfswrite(telnet_sock, "quit");
 	fgfsclose(telnet_sock);
 
+	if(!fg_packet)
+		SDLNet_FreePacket(fg_packet);
+
+
 	// Adn generic
-	fgfsclose(client_sock);
-	fgfsclose(server_sock);
+	//fgfsclose(client_sock);
+	//fgfsclose(server_sock);
+	SDLNet_UDP_Close(server_sock);
 
 	SDLNet_FreeSocketSet(socketset);
 
@@ -1153,8 +1178,53 @@ TCPsocket fgfsconnect(const Uint32 host, const Uint16 port)
 			return NULL;
 		}
 
-		client_sock = _clientsock;
+		//client_sock = _clientsock;
 
 		return _sock;
 	}
+}
+
+UDPsocket fgfs_udp_reader(const Uint16 port)
+{
+	UDPsocket _sock;
+
+	_sock = SDLNet_UDP_Open(port);
+	if(!_sock) {
+		printf("Error in fgfs_udp_reader, open: %s\n", SDLNet_GetError());
+		return NULL;
+	}
+
+	return _sock;
+}
+
+Uint32 fgfs_wait_packet(UDPsocket socket)
+{
+	time_t start;
+	UDPpacket *p;
+	int ret;
+	Uint32 host;
+
+	p = SDLNet_AllocPacket(512);
+	if(!p) {
+		printf("Memory allocation error in fgfs_wait_packet: %s\n", SDLNet_GetError());
+		return 0;
+	}
+
+	start = clock();
+	do {
+		SDL_Delay(50);
+		ret = SDLNet_UDP_Recv(socket, p);
+	} while (!ret && clock() < (start + CONN_TIMEOUT * CLOCKS_PER_SEC));
+
+	if(!ret) {
+		printf("Timeout in fgfs_wait_packet\n");
+		SDLNet_FreePacket(p);
+		return 0;
+	}
+
+	host = p->address.host;
+
+	SDLNet_FreePacket(p);
+
+	return host;
 }
