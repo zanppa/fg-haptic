@@ -166,6 +166,26 @@
           <hrule><stretch>1</stretch></hrule>
         </group>
 
+        <!-- Mode selection combo -->
+        <combo>
+          <name>control-surface-mode</name>
+          <!-- <width>400</width> -->
+          <property>/sim/gui/dialogs/force-feedback/control-surface-mode</property>
+          <halign>fill</halign>
+          <stretch>1</stretch>
+          <value>Normal</value>
+          <value>Alternate</value>
+          <binding>
+            <command>dialog-apply</command>
+            <object-name>control-surface-mode</object-name>
+          </binding>
+          <binding>
+            <command>nasal</command>
+            <script>applyChanges();</script>
+          </binding>
+        </combo>
+
+
         <!-- Slider -->
         <group>
           <name>control-surface-strength</name>
@@ -506,20 +526,41 @@
     <vrule><stretch>1</stretch></vrule>
 
     <!-- Right side -->
+
+    <!-- Ground rumble effect -->
     <group>
       <layout>vbox</layout>
 
       <!-- Name -->
       <group>
         <layout>hbox</layout>
-        <text><label>Ground rumble</label><enable><property>/sim/gui/dialogs/force-feedback/pilot-g-enable</property></enable></text>
+        <text><label>Ground rumble</label><enable><property>/sim/gui/dialogs/force-feedback/ground-rumble-enable</property></enable></text>
         <hrule><stretch>1</stretch></hrule>
       </group>
+
+      <combo>
+        <name>ground-rumble-mode</name>
+        <!-- <width>400</width> -->
+        <property>/sim/gui/dialogs/force-feedback/ground-rumble-mode</property>
+        <halign>fill</halign>
+        <stretch>1</stretch>
+        <value>Normal</value>
+        <value>Alternate</value>
+        <binding>
+          <command>dialog-apply</command>
+          <object-name>ground-rumble-mode</object-name>
+        </binding>
+        <binding>
+          <command>nasal</command>
+          <script>applyChanges();</script>
+        </binding>
+      </combo>
+
 
       <!-- Slider -->
       <group>
         <layout>hbox</layout>
-        <text><label>Strength</label><enable><property>/sim/gui/dialogs/force-feedback/pilot-g-enable</property></enable></text>
+        <text><label>Strength</label><enable><property>/sim/gui/dialogs/force-feedback/ground-rumble-enable</property></enable></text>
         <slider>
           <name>ground-rumble-strength</name>
           <!-- <width>100</width> -->
@@ -536,14 +577,14 @@
             <script>applyChanges();</script>
           </binding>
           <live>true</live>
-          <enable><property>/sim/gui/dialogs/force-feedback/pilot-g-enable</property></enable>
+          <enable><property>/sim/gui/dialogs/force-feedback/ground-rumble-enable</property></enable>
         </slider>
         <text>
           <label>0.00</label>
           <property>/sim/gui/dialogs/force-feedback/ground-rumble-strength</property>
           <format>%-0.2f</format>
           <live>true</live>
-          <enable><property>/sim/gui/dialogs/force-feedback/pilot-g-enable</property></enable>
+          <enable><property>/sim/gui/dialogs/force-feedback/ground-rumble-enable</property></enable>
         </text>
       </group>
     </group>
@@ -656,8 +697,21 @@
             setprop("/haptic/device[" ~ i ~ "]/stick-shaker/direction", getprop("/sim/gui/dialogs/force-feedback/stick-shaker-direction"));
             setprop("/haptic/device[" ~ i ~ "]/stick-shaker/period", getprop("/sim/gui/dialogs/force-feedback/stick-shaker-period"));
             setprop("/haptic/device[" ~ i ~ "]/ground-rumble/gain", getprop("/sim/gui/dialogs/force-feedback/ground-rumble-strength"));
+            setprop("/haptic/device[" ~ i ~ "]/ground-rumble/mode", getprop("/sim/gui/dialogs/force-feedback/ground-rumble-mode"));
             # setprop("/haptic/device[" ~ i ~ "]/", getprop("/sim/gui/dialogs/force-feedback/"));
             # setprop("/haptic/device[" ~ i ~ "]/", getprop("/sim/gui/dialogs/force-feedback/"));
+
+            var mode = getprop("/sim/gui/dialogs/force-feedback/control-surface-mode");
+            if(mode == "Normal")
+              setprop("/haptic/device[" ~ i ~ "]/stick-force/mode", 0);
+            else
+              setprop("/haptic/device[" ~ i ~ "]/stick-force/mode", 1);
+
+            var mode = getprop("/sim/gui/dialogs/force-feedback/ground-rumble-mode");
+            if(mode == "Normal")
+              setprop("/haptic/device[" ~ i ~ "]/ground-rumble/mode", 0);
+            else
+              setprop("/haptic/device[" ~ i ~ "]/ground-rumble/mode", 1);
 
             gui.dialog_update("force-feedback");
             return;
@@ -780,6 +834,10 @@
         effect = getprop("/haptic/device[" ~ dev ~ "]/ground-rumble/gain");
         if(effect == nil) effect = 0;
         setprop("/sim/gui/dialogs/force-feedback/ground-rumble-strength", effect);
+
+        effect = getprop("/haptic/device[" ~ dev ~ "]/ground-rumble/supported");
+        if(effect == nil) setprop("/sim/gui/dialogs/force-feedback/ground-rumble-enable", "false");
+        else setprop("/sim/gui/dialogs/force-feedback/ground-rumble-enable", "true");
 
 
         # TODO: Set combo box default/set values
