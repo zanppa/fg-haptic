@@ -77,8 +77,9 @@ var update_stick_forces = func(path) {
 
   #if(stick_force_path.getNode("gain").getValue() < 0.001) return;
 
-  var mode = stick_force_path.getNode("mode").getValue();
-  if(mode == nil) return;
+  var mode = 1;	# Default to alternate mode which most likely is supported
+  var mode_path = stick_force_path.getNode("mode");
+  if(mode_path != nil) mode = mode_path.getValue();
 
   var airspeed = getprop("/velocities/airspeed-kt");
   var AoA = getprop("/orientation/alpha-deg")*0.01745329;

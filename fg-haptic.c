@@ -243,17 +243,20 @@ void send_devices(void)
 			fgfswrite(telnet_sock, "set /haptic/device[%d]/stick-force/supported 1", i);
 			fgfswrite(telnet_sock, "set /haptic/device[%d]/stick-force/alternate 1", i);
 			fgfswrite(telnet_sock, "set /haptic/device[%d]/stick-force/gain %f", i, devices[i].stick_gain);
+			fgfswrite(telnet_sock, "set /haptic/device[%d]/stick-force/mode 1", i);
 
 			fgfswrite(telnet_sock, "set /haptic/device[%d]/ground-rumble/supported 1", i);
 			fgfswrite(telnet_sock, "set /haptic/device[%d]/ground-rumble/alternate 1", i);
 			fgfswrite(telnet_sock, "set /haptic/device[%d]/ground-rumble/period 0.0", i);
 			fgfswrite(telnet_sock, "set /haptic/device[%d]/ground-rumble/gain %f", i, devices[i].rumble_gain);
+			fgfswrite(telnet_sock, "set /haptic/device[%d]/ground-rumble/mode 0", i);
 		}
 
 		if (devices[i].supported & SDL_HAPTIC_SPRING) {
 			fgfswrite(telnet_sock, "set /haptic/device[%d]/stick-force/supported 1", i);
 			fgfswrite(telnet_sock, "set /haptic/device[%d]/stick-force/normal 1", i);
 			fgfswrite(telnet_sock, "set /haptic/device[%d]/stick-force/gain %f", i, devices[i].stick_gain);
+			fgfswrite(telnet_sock, "set /haptic/device[%d]/stick-force/mode 0", i);
 		}
 
 		if (devices[i].supported & SDL_HAPTIC_SINE) {
@@ -595,13 +598,13 @@ void read_fg(void)
 	printf("%s\n", p);
 
 	// Divide the buffer into chunks
-	read = sscanf(p, "%d|%f|%f|%f|%f|%f|%f|%f|%f|%f%d|%f", &reconf,
+	read = sscanf(p, "%d|%f|%f|%f|%f|%f|%f|%f|%f|%f|%d|%f", &reconf,
 		      &new_params.pilot[0], &new_params.pilot[1], &new_params.pilot[2],
 		      &new_params.stick[0], &new_params.stick[1], &new_params.stick[2],
 		      &new_params.trim[0], &new_params.trim[1], &new_params.trim[2],
 		      &new_params.shaker_trigger, &new_params.rumble_period);
 
-	if (read != 9) {
+	if (read != 12) {
 		printf("Error reading generic I/O!\n");
 		return;
 	}
