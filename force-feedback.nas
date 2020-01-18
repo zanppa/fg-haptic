@@ -77,7 +77,7 @@ var update_stick_forces = func(path) {
 
   #if(stick_force_path.getNode("gain").getValue() < 0.001) return;
 
-  var mode = 1;	# Default to alternate mode which most likely is supported
+  var mode = 0;	# Default to normal mode
   var mode_path = stick_force_path.getNode("mode");
   if(mode_path != nil) mode = mode_path.getValue();
 
@@ -134,8 +134,7 @@ var update_stick_forces = func(path) {
   aileron_force = aileron_force * (1 - stall_coeff);
 
 
-  # Wing shadowing effect, again simple smooth function going from 1 to 0
-  # TODO: Should probably go back to 1 after the shadow has passed?
+  # Wing shadowing effect, parabolic function going from 1 to 0 and back to 1
   if(wing_shadow_AoA != nil and wing_shadow_angle != nil)
   {
     if(AoA > wing_shadow_AoA and AoA < wing_shadow_AoA + wing_shadow_angle)
@@ -144,7 +143,7 @@ var update_stick_forces = func(path) {
       shadow = shadow / (wing_shadow_angle * 0.5);
       shadow = shadow * shadow;
       if(shadow > 1.0) shadow = 1.0;
-      elevator_force = elevator_force * (1.0 - shadow);
+      elevator_force = elevator_force * shadow;
     }
   }
 
@@ -213,7 +212,7 @@ var run_test_mode = func(path) {
   var z = 0.0;
   var shaker = 0;
 
-  var pilot_force_path = path.getNode("pilot");
+  var stick_force_path = path.getNode("stick-force");
 
   if(test_duration < 10)
   {
@@ -222,7 +221,7 @@ var run_test_mode = func(path) {
     y = math.cos(3.14159*test_duration/5.0);
     z = math.sin(3.14159*test_duration/5.0);
   }
-  else if(test_duration < 12)
+  else if(test_duration < 16)
   {
     # Test stick shaker
     shaker = 1;
@@ -234,10 +233,10 @@ var run_test_mode = func(path) {
   }
 
   # Set parameters
-  if(pilot_force_path != nil) {
-    pilot_force_path.getNode("x").setValue(x);
-    pilot_force_path.getNode("y").setValue(y);
-    pilot_force_path.getNode("z").setValue(z);
+  if(stick_force_path != nil) {
+    stick_force_path.getNode("aileron").setValue(x);
+    stick_force_path.getNode("elevator").setValue(y);
+    stick_force_path.getNode("rudder").setValue(z);
   }
   setprop("/haptic/stick-shaker/trigger", shaker);
 
@@ -321,7 +320,7 @@ _setlistener("/sim/signals/fdm-initialized", func {
 _setlistener("/sim/signals/nasal-dir-initialized", func {
 
   # Add default parameters to property tree
-  # TODO: Update constants from aircraft setup
+  # TODO: Update constants from aircraft setup?
   props.globals.initNode("/haptic/aircraft-setup/aileron-max-deflection-deg", aileron_max_deflection/0.01745329, "DOUBLE");
   props.globals.initNode("/haptic/aircraft-setup/elevator-max-deflection-deg", elevator_max_deflection/0.01745329, "DOUBLE");
   props.globals.initNode("/haptic/aircraft-setup/rudder-max-deflection-deg", rudder_max_deflection/0.01745329, "DOUBLE");
@@ -339,22 +338,25 @@ _setlistener("/sim/signals/nasal-dir-initialized", func {
   props.globals.initNode("/haptic/aircraft-setup/wing-shadow-angle-deg", wing_shadow_angle/0.01745329, "DOUBLE");
   props.globals.initNode("/haptic/aircraft-setup/stick-shaker-AoA", stick_shaker_AoA/0.01745329, "DOUBLE");
 
-  props.globals.initNode("/haptic/enable-force-trim-aileron", 0, "BOOL");
-  props.globals.initNode("/haptic/enable-force-trim-elevator", 0, "BOOL");
-  props.globals.initNode("/haptic/enable-force-trim-rudder", 0, "BOOL");
-  enable_force_trim_aileron = props.globals.getNode("/haptic/enable-force-trim-aileron", 1);
-  enable_force_trim_elevator = props.globals.getNode("/haptic/enable-force-trim-elevator", 1);
-  enable_force_trim_rudder = props.globals.getNode("/haptic/enable-force-trim-rudder", 1);
-  props.globals.initNode("/haptic/force-trim-aileron", 0.0, "DOUBLE");
-  props.globals.initNode("/haptic/force-trim-elevator", 0.0, "DOUBLE");
-  props.globals.initNode("/haptic/force-trim-rudder", 0.0, "DOUBLE");
-  aileron_trim_prop = props.globals.getNode("/haptic/force-trim-aileron", 1);
-  elevator_trim_prop = props.globals.getNode("/haptic/force-trim-elevator", 1);
-  rudder_trim_prop = props.globals.getNode("/haptic/force-trim-rudder", 1);
+  enable_force_trim_aileron = props.globals.initNode("/haptic/enable-force-trim-aileron", 0, "BOOL");
+  enable_force_trim_elevator = props.globals.initNode("/haptic/enable-force-trim-elevator", 0, "BOOL");
+  enable_force_trim_rudder = props.globals.initNode("/haptic/enable-force-trim-rudder", 0, "BOOL");
+  aileron_trim_prop = props.globals.initNode("/haptic/force-trim-aileron", 0.0, "DOUBLE");
+  elevator_trim_prop = props.globals.initNode("/haptic/force-trim-elevator", 0.0, "DOUBLE");
+  rudder_trim_prop = props.globals.initNode("/haptic/force-trim-rudder", 0.0, "DOUBLE");
+  props.globals.initNode("/haptic/stick-force/trim-aileron", 0.0, "DOUBLE");
+  props.globals.initNode("/haptic/stick-force/trim-elevator", 0.0, "DOUBLE");
+  props.globals.initNode("/haptic/stick-force/trim-rudder", 0.0, "DOUBLE");
 
+  props.globals.initNode("/haptic/stick-force/gain", 0.0, "DOUBLE");
+  props.globals.initNode("/haptic/stick-force/mode", 0, "INT");
+  
+  props.globals.initNode("/haptic/ground-rumble/gain", 0.0, "DOUBLE");
+  props.globals.initNode("/haptic/ground-rumble/mode", 0, "INT");
+  
   props.globals.initNode("/haptic/test-mode", 0, "BOOL");
 
-
+ 
   # Add dialog to menu
   props.globals.getNode("/sim/menubar/default/menu[9]/item[99]/enabled", 1).setBoolValue(1);
   props.globals.getNode("/sim/menubar/default/menu[9]/item[99]/name", 1).setValue("force-feedback");
