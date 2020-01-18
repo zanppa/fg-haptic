@@ -2,8 +2,10 @@ Fg-Haptic
 =========
 
 Force feedback (haptic) support for Flight Gear flight simulator
-Version 0.1.1
-Copyright Lauri Peltonen, 2011
+
+Version 0.5
+
+Copyright (C) Lauri Peltonen, 2011, 2020
 
 This program is released under GPLv2 or later.
 
@@ -18,9 +20,9 @@ This force feedback support consists of 4 components:
 - ff-protocol.xml
 
 fg-haptic or fg-haptic.exe is the main program, which
-supports force feedback devices through SDL 1.3 library.
+supports force feedback devices through SDL 2 library.
 
-force-feedback.xml is a configuration utility which resides
+force-feedback.xml is a configuration dialog which resides
 inside Flight Gear's data directory.
 
 force-feedback.nas is a wrapper between different flight
@@ -32,10 +34,8 @@ uses to communicate with flight Gear.
 This program has been tested with following devices:
 
 - Saitek Cyborg Evo Force (Linux)
-  * Does not support updating effects while running
-    which makes pilot/surface forces feel bad
   * All effects supported
-  * Needs special kernel patch (for kernel 3.0.0)
+  * Needs special kernel patch
 
 - Gametech "Twin USB Joystick" gamepad with rumble effect (Linux)
   * Supports only stick shaker, if gain & strength are around 1.0
@@ -75,13 +75,13 @@ Installation
 
 fg-haptic(.exe) can reside anywhere on your system.
 
-force-feedback.xml must be copied into gui/dialogs/ directory
+force-feedback.xml must be copied into **gui/dialogs/** directory
 inside Flight Gear's data directory.
 
-force-feedback.nas must be copied into Nasal/ directory
+force-feedback.nas must be copied into **Nasal/** directory
 inside Flight Gear's data directory.
 
-ff-protocol.xml must be copied into Protocol/ directory
+ff-protocol.xml must be copied into **Protocol/** directory
 inside Flight Gear's data directory.
 
 
@@ -99,13 +99,31 @@ You can also launch them in different order (fg-haptic first). Also you can
 replace localhost with any other address, fg-haptic tries to determine the
 FlightGear's address from the first received packet.
 
+fg-haptic expects telnet to be at port 5401 and receives generic IO on port
+5402. These are currently hard coded. Note that compared to previous versions,
+fg-haptic now uses UDP so fg-haptic can be launched/restarted while Flight Gear
+is running.
+
 If FlightGear's menu is not visible, press F10 to display it.
 In the Help menu you can find Force feedback options.
 Tune them to your liking and fly!
-
 
 To test force feedback effects, run
 
 ```fg-haptic --test```    or  ```fg-haptic -t```
 
-which tests all effects on all connected joysticks.
+which tests all effects on all connected joysticks. There is also a simple test
+implemented in the dialog inside Flight Gear.
+
+Effects
+-------
+
+There are currently following effects implemented:
+- Pilot forces. Any force (acceleration) on the pilot can be transferred to the
+force feedback device.'
+- Stick forces. Basic effect is speed dependent stiffening of the joystick. Other
+effects include stick shaker when the aircraft is about to stall and stick pusher
+if aircraft AoA is too high.
+- Ground rumble. A periodic "click" when speeding up on a runway.
+- Force feedback trim, which changes the center location of the joystick depending
+on the trim value.
