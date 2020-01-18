@@ -77,9 +77,9 @@ var update_stick_forces = func(path) {
 
   #if(stick_force_path.getNode("gain").getValue() < 0.001) return;
 
-  var aileron_angle = (getprop("/controls/flight/aileron") + aileron_trim_prop.getValue()) * aileron_max_deflection;
-  var elevator_angle = (getprop("/controls/flight/elevator") + elevator_trim_prop.getValue()) * elevator_max_deflection;
-  var rudder_angle = (getprop("/controls/flight/rudder") + rudder_trim_prop.getValue()) * rudder_max_deflection;
+  var mode = 1;	# Default to alternate mode which most likely is supported
+  var mode_path = stick_force_path.getNode("mode");
+  if(mode_path != nil) mode = mode_path.getValue();
 
   var airspeed = getprop("/velocities/airspeed-kt");
   var AoA = getprop("/orientation/alpha-deg")*0.01745329;
@@ -87,35 +87,55 @@ var update_stick_forces = func(path) {
   var density = getprop("/environment/density-slugft3");
   var g_force = getprop("/accelerations/pilot/z-accel-fps_sec") + 32.174;
 
-
-  # TODO: Check whether AoA should be + or -!
-  elevator_angle = elevator_angle + AoA;
-  rudder_angle = rudder_angle - slip_angle;
-
-  slip_gain = 1.0 - slip_gain * math.sin(slip_angle);
-
-
   # Basic forces from air flow, taking slip into account if desirable
   # 0.5 * air_density * airspeed^2 * drag_coeff (assuming 2) * Area
   var base_force = density * airspeed * airspeed;
-  
-  var aileron_force = base_force * aileron_gain * math.sin(aileron_angle) * slip_gain;
-  
-  var elevator_force = base_force * elevator_gain * math.sin(elevator_angle) * slip_gain;
-  elevator_force = elevator_force + g_force_gain * g_force;
 
-  var rudder_force = base_force * rudder_gain * math.sin(rudder_angle);
+  # In normal mode the spring effect force gain depends only on
+  # airspeed, density and surface area. Stick calculates the actual
+  # force based on stick deviation from center
+  var aileron_force = base_force * aileron_gain;
+  var elevator_force = base_force * elevator_gain;
+  var rudder_force = base_force * rudder_gain;
+
+  if(mode == 1) {
+    # In alternate mode the control surface forces are done using constant force
+    # so we need to calculate the actual force based on surface angles etc.
+
+    # This also takes trim into account as it works as an offset to the force zero angle
+
+    var aileron_angle = (getprop("/controls/flight/aileron") + aileron_trim_prop.getValue()) * aileron_max_deflection;
+    var elevator_angle = (getprop("/controls/flight/elevator") + elevator_trim_prop.getValue()) * elevator_max_deflection;
+    var rudder_angle = (getprop("/controls/flight/rudder") + rudder_trim_prop.getValue()) * rudder_max_deflection;
+
+    # TODO: Check whether AoA should be + or -!
+    elevator_angle = elevator_angle + AoA;
+    rudder_angle = rudder_angle - slip_angle;
+
+    slip_gain = 1.0 - slip_gain * math.sin(slip_angle);
+
+    aileron_force = aileron_force * math.sin(aileron_angle) * slip_gain;
   
+    elevator_force = elevator_force * math.sin(elevator_angle) * slip_gain;
+    elevator_force = elevator_force + g_force_gain * g_force;
+
+    rudder_force = rudder_force * math.sin(rudder_angle);
+  }  
+
+
   # Stall condition, assuming rudder wont stall
-  # A smooth "step" function going from 0 to 1
+  # A smooth "step" function going from 0 to 1, i.e. at deep stall
+  # the stick forces are zero
   var stall_coeff = (AoA / stall_AoA);
   stall_coeff = stall_coeff * stall_coeff * stall_coeff * stall_coeff;
   if(stall_coeff > 1.0) stall_coeff = 1.0;
+
   elevator_force = elevator_force * (1 - stall_coeff);
   aileron_force = aileron_force * (1 - stall_coeff);
 
 
   # Wing shadowing effect, again simple smooth function going from 1 to 0
+  # TODO: Should probably go back to 1 after the shadow has passed?
   if(wing_shadow_AoA != nil and wing_shadow_angle != nil)
   {
     if(AoA > wing_shadow_AoA and AoA < wing_shadow_AoA + wing_shadow_angle)
@@ -127,6 +147,17 @@ var update_stick_forces = func(path) {
       elevator_force = elevator_force * (1.0 - shadow);
     }
   }
+
+  # Trim is handled differently if normal mode is enabled
+  # trim changes the stick zero offset position
+  if(mode == 0) {
+    var axis_x = stick_force_path.getNode("trim-aileron", 1);
+    if(axis_x != nil) axis_x.setValue(aileron_trim_prop.getValue());
+    var axis_y = stick_force_path.getNode("trim-elevator", 1);
+    if(axis_y != nil) axis_y.setValue(elevator_trim_prop.getValue());
+    var axis_z = stick_force_path.getNode("trim-rudder", 1);
+    if(axis_z != nil) axis_z.setValue(rudder_trim_prop.getValue());
+  }
   
   # Stick pusher
   if(pusher_start_AoA != nil and pusher_working_angle != nil) {
@@ -135,13 +166,13 @@ var update_stick_forces = func(path) {
   }
 
   # TODO: Axis mapping!
-  var axis_x = stick_force_path.getNode("aileron");
+  var axis_x = stick_force_path.getNode("aileron", 1);
   if(axis_x != nil) axis_x.setValue(-aileron_force);
 
-  var axis_y = stick_force_path.getNode("elevator");
+  var axis_y = stick_force_path.getNode("elevator", 1);
   if(axis_y != nil) axis_y.setValue(-elevator_force);
 
-  var axis_z = stick_force_path.getNode("rudder");
+  var axis_z = stick_force_path.getNode("rudder", 1);
   if(axis_z != nil) axis_z.setValue(rudder_force);
 
 
@@ -182,7 +213,7 @@ var run_test_mode = func(path) {
   var z = 0.0;
   var shaker = 0;
 
-  var stick_force_path = path.getNode("stick-force");
+  var pilot_force_path = path.getNode("pilot");
 
   if(test_duration < 10)
   {
@@ -191,7 +222,7 @@ var run_test_mode = func(path) {
     y = math.cos(3.14159*test_duration/5.0);
     z = math.sin(3.14159*test_duration/5.0);
   }
-  else if(test_duration < 16)
+  else if(test_duration < 12)
   {
     # Test stick shaker
     shaker = 1;
@@ -203,10 +234,10 @@ var run_test_mode = func(path) {
   }
 
   # Set parameters
-  if(stick_force_path != nil) {
-    stick_force_path.getNode("aileron").setValue(x);
-    stick_force_path.getNode("elevator").setValue(y);
-    stick_force_path.getNode("rudder").setValue(z);
+  if(pilot_force_path != nil) {
+    pilot_force_path.getNode("x").setValue(x);
+    pilot_force_path.getNode("y").setValue(y);
+    pilot_force_path.getNode("z").setValue(z);
   }
   setprop("/haptic/stick-shaker/trigger", shaker);
 

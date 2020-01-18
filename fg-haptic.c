@@ -22,7 +22,7 @@
 #include <sys/time.h>
 #include <stdarg.h>
 
-#define DFLTHOST        "localhost"
+/* #define DFLTHOST        "localhost" */
 #define DFLTPORT        5401
 #define MAXMSG          512
 #define fgfsclose       SDLNet_TCP_Close
@@ -40,29 +40,39 @@
 #define CONST_X		0
 #define CONST_Y		1
 #define CONST_Z		2
-#define STICK_SHAKER	3
-#define FRICTION	4
-#define DAMPER		5
+#define SPRING		3
+#define STICK_SHAKER	4
+#define GROUND_NOTCH	5
+/* #define FRICTION	5 */
 
 #define EFFECTS		9
 
+
+#define MODE_NORMAL		0
+#define MODE_ALTERNATE	1
 const char axes[AXES] = { 'x', 'y', 'z' };
 
 //void init_sockaddr(struct sockaddr_in *name, const char *hostname, unsigned port);
-TCPsocket fgfsconnect(const char *hostname, const int port, bool server);
+TCPsocket fgfsconnect(const Uint32 host, const Uint16 port);
+UDPsocket fgfs_udp_reader(const Uint16 port);
+Uint32 fgfs_wait_packet(UDPsocket socket);
 int fgfswrite(TCPsocket sock, char *msg, ...);
 const char *fgfsread(TCPsocket sock, int wait);
 void fgfsflush(TCPsocket sock);
 
 // Socket used to communicate with flightgear
-TCPsocket telnet_sock, server_sock, client_sock;
+TCPsocket telnet_sock;
+UDPsocket server_sock;
+IPaddress *client_addr;
 SDLNet_SocketSet socketset;
 
 // Effect struct definitions, used to store parameters
 typedef struct __effectParams {
 	float pilot[AXES];
 	float stick[AXES];
+	float trim[AXES];
 	int shaker_trigger;
+
 	float rumble_period;	// Ground rumble period, 0=disable
 
 	float x;		// Forces
@@ -98,6 +108,9 @@ typedef struct __hapticdevice {
 	float shaker_gain;
 	float rumble_gain;
 
+	unsigned char rumble_mode;
+	unsigned char stick_mode;
+
 	// TODO: Possibility to invert axes
 	signed char pilot_axes[AXES];	// Axes mapping, -1 = not used
 	signed char stick_axes[AXES];
@@ -130,9 +143,6 @@ void init_haptic(void)
 	/* Initialize the force feedbackness */
 	SDL_Init(SDL_INIT_TIMER | SDL_INIT_JOYSTICK | SDL_INIT_HAPTIC);
 
-	// Initialize network
-	SDLNet_Init();
-
 	num_devices = SDL_NumHaptics();
 	printf("%d Haptic devices detected.\n", num_devices);
 
@@ -144,7 +154,7 @@ void init_haptic(void)
 	// Zero
 	memset(devices, 0, num_devices * sizeof(hapticDevice));
 
-	// Send all devices' data to flightgear
+	// Parse device data
 	for (int i = 0; i < num_devices; i++) {
 		devices[i].num = i + 1;	// Add one, so we get around flightgear reading empty properties as 0
 		devices[i].device = SDL_HapticOpen(i);
@@ -191,9 +201,11 @@ void init_haptic(void)
 			devices[i].gain = 1.0;
 			devices[i].pilot_gain = 0.1;
 			devices[i].stick_gain = 1.0;
-			devices[i].shaker_gain = 1.0;
+			devices[i].stick_mode = MODE_NORMAL;
+			devices[i].shaker_gain = 0.4;
 			devices[i].shaker_period = 100.0;
-			devices[i].rumble_gain = 0.4;
+			devices[i].rumble_gain = 0.25;
+			devices[i].rumble_mode = MODE_NORMAL;
 			devices[i].lowpass = 300.0;
 
 		} else {
@@ -232,22 +244,41 @@ void send_devices(void)
 				fgfswrite(telnet_sock, "set /haptic/device[%d]/stick-force/%c %d", i, axes[x], devices[i].stick_axes[x]);
 			}
 			fgfswrite(telnet_sock, "set /haptic/device[%d]/pilot/gain %f", i, devices[i].pilot_gain);
-			fgfswrite(telnet_sock, "set /haptic/device[%d]/stick-force/gain %f", i, devices[i].stick_gain);
-			fgfswrite(telnet_sock, "set /haptic/device[%d]/stick-force/supported 1", i);
 			fgfswrite(telnet_sock, "set /haptic/device[%d]/pilot/supported 1", i);
 
+			fgfswrite(telnet_sock, "set /haptic/device[%d]/stick-force/supported 1", i);
+			fgfswrite(telnet_sock, "set /haptic/device[%d]/stick-force/alternate 1", i);
+			fgfswrite(telnet_sock, "set /haptic/device[%d]/stick-force/gain %f", i, devices[i].stick_gain);
+			fgfswrite(telnet_sock, "set /haptic/device[%d]/stick-force/mode 1", i);
+
+			fgfswrite(telnet_sock, "set /haptic/device[%d]/ground-rumble/supported 1", i);
+			fgfswrite(telnet_sock, "set /haptic/device[%d]/ground-rumble/alternate 1", i);
 			fgfswrite(telnet_sock, "set /haptic/device[%d]/ground-rumble/period 0.0", i);
 			fgfswrite(telnet_sock, "set /haptic/device[%d]/ground-rumble/gain %f", i, devices[i].rumble_gain);
-			fgfswrite(telnet_sock, "set /haptic/device[%d]/ground-rumble/supported 1", i);
+			fgfswrite(telnet_sock, "set /haptic/device[%d]/ground-rumble/mode 0", i);
+		}
+
+		if (devices[i].supported & SDL_HAPTIC_SPRING) {
+			fgfswrite(telnet_sock, "set /haptic/device[%d]/stick-force/supported 1", i);
+			fgfswrite(telnet_sock, "set /haptic/device[%d]/stick-force/normal 1", i);
+			fgfswrite(telnet_sock, "set /haptic/device[%d]/stick-force/gain %f", i, devices[i].stick_gain);
+			fgfswrite(telnet_sock, "set /haptic/device[%d]/stick-force/mode 0", i);
 		}
 
 		if (devices[i].supported & SDL_HAPTIC_SINE) {
 			// Sine effect -> rumble is stick shaker
+			fgfswrite(telnet_sock, "set /haptic/device[%d]/stick-shaker/supported 1", i);
 			fgfswrite(telnet_sock, "set /haptic/device[%d]/stick-shaker/direction %f", i, devices[i].shaker_dir);
 			fgfswrite(telnet_sock, "set /haptic/device[%d]/stick-shaker/period %f", i, devices[i].shaker_period);
 			fgfswrite(telnet_sock, "set /haptic/device[%d]/stick-shaker/gain %f", i, devices[i].shaker_gain);
 			fgfswrite(telnet_sock, "set /haptic/device[%d]/stick-shaker/trigger 0", i);
-			fgfswrite(telnet_sock, "set /haptic/device[%d]/stick-shaker/supported 1", i);
+		}
+
+		if (devices[i].supported & SDL_HAPTIC_SAWTOOTHDOWN) {
+			fgfswrite(telnet_sock, "set /haptic/device[%d]/ground-rumble/supported 1", i);
+			fgfswrite(telnet_sock, "set /haptic/device[%d]/ground-rumble/normal 1", i);
+			fgfswrite(telnet_sock, "set /haptic/device[%d]/ground-rumble/period 0.0", i);
+			fgfswrite(telnet_sock, "set /haptic/device[%d]/ground-rumble/gain %f", i, devices[i].rumble_gain);
 		}
 
 		if (devices[i].supported & SDL_HAPTIC_GAIN) {
@@ -311,6 +342,7 @@ void read_devices(void)
 					read = sscanf(p, "%d", &idata);
 					if (read == 1)
 						devices[i].pilot_axes[x] = idata;
+					printf("Pilot force axis %c: %c\n", axes[x], axes[devices[i].pilot_axes[x]]);
 				}
 
 				fgfswrite(telnet_sock, "get /haptic/device[%d]/stick-force/%c", i, axes[x]);
@@ -319,6 +351,7 @@ void read_devices(void)
 					read = sscanf(p, "%d", &idata);
 					if (read == 1)
 						devices[i].stick_axes[x] = idata;
+					printf("Stick force axis %c: %c\n", axes[x], axes[devices[i].stick_axes[x]]);
 				}
 			}
 			fgfswrite(telnet_sock, "get /haptic/device[%d]/pilot/gain", i);
@@ -335,6 +368,13 @@ void read_devices(void)
 				if (read == 1)
 					devices[i].stick_gain = fdata;
 			}
+			fgfswrite(telnet_sock, "get /haptic/device[%d]/stick-force/mode", i);
+			p = fgfsread(telnet_sock, READ_TIMEOUT);
+			if (p) {
+				read = sscanf(p, "%d", &idata);
+				if (read == 1)
+					devices[i].stick_mode = idata;
+			}
 
 			fgfswrite(telnet_sock, "get /haptic/device[%d]/ground-rumble/gain", i);
 			p = fgfsread(telnet_sock, READ_TIMEOUT);
@@ -342,6 +382,13 @@ void read_devices(void)
 				read = sscanf(p, "%f", &fdata);
 				if (read == 1)
 					devices[i].rumble_gain = fdata;
+			}
+			fgfswrite(telnet_sock, "get /haptic/device[%d]/ground-rumble/mode", i);
+			p = fgfsread(telnet_sock, READ_TIMEOUT);
+			if (p) {
+				read = sscanf(p, "%d", &idata);
+				if (read == 1)
+					devices[i].rumble_mode = idata;
 			}
 		}
 
@@ -382,7 +429,7 @@ void read_devices(void)
 	} while (read == 1 && idata == 1);
 	printf("Done\n");
 
-	fgfsflush(client_sock);	// Get rid of FF data that was received during reinitialization
+	//fgfsflush(client_sock);	// Get rid of FF data that was received during reinitialization
 
 	return;
 }
@@ -409,16 +456,40 @@ void create_effects(void)
 		if (devices[i].supported & SDL_HAPTIC_GAIN)
 			SDL_HapticSetGain(devices[i].device, devices[i].gain * 100);
 
+		// Spring effect for stick forces (normal mode)
+		if (devices[i].supported & SDL_HAPTIC_SPRING && devices[i].stick_gain > 0.001 && devices[i].stick_mode == MODE_NORMAL) {
+			printf("\tSpring effect\n");
+			devices[i].effect[SPRING].type = SDL_HAPTIC_SPRING;
+			devices[i].effect[SPRING].condition.length = SDL_HAPTIC_INFINITY;
+
+			for(int j = 0; j < AXES; j++) {
+				devices[i].effect[SPRING].condition.left_sat[j] = 0xFFFF;
+				devices[i].effect[SPRING].condition.right_sat[j] = 0xFFFF;
+				devices[i].effect[SPRING].condition.left_coeff[j] = 0;
+				devices[i].effect[SPRING].condition.right_coeff[j] = 0;
+				devices[i].effect[SPRING].condition.deadband[j] = 0;
+				devices[i].effect[SPRING].condition.center[j] = 0;
+			}
+
+			devices[i].effectId[SPRING] = SDL_HapticNewEffect(devices[i].device, &devices[i].effect[SPRING]);
+			if (devices[i].effectId[SPRING] < 0) {
+				printf("UPLOADING EFFECT ERROR: %s\n", SDL_GetError());
+				devices[i].effectId[SPRING] = -1;
+				//devices[i].supported &= ~SDL_HAPTIC_SPRING;
+			}
+		}
+
 		// Stick shaker
 		if (devices[i].supported & SDL_HAPTIC_SINE && devices[i].shaker_gain > 0.001) {
+			printf("\tStick shaker\n");
 			devices[i].effect[STICK_SHAKER].type = SDL_HAPTIC_SINE;
 			devices[i].effect[STICK_SHAKER].periodic.direction.type = SDL_HAPTIC_POLAR;
 			devices[i].effect[STICK_SHAKER].periodic.direction.dir[0] = devices[i].shaker_dir;
 			devices[i].effect[STICK_SHAKER].periodic.direction.dir[1] = 0;
 			devices[i].effect[STICK_SHAKER].periodic.direction.dir[2] = 0;
-			devices[i].effect[STICK_SHAKER].periodic.length = 5000;	// Default 5 seconds?
+			devices[i].effect[STICK_SHAKER].periodic.length = SDL_HAPTIC_INFINITY;
 			devices[i].effect[STICK_SHAKER].periodic.period = devices[i].shaker_period;
-			devices[i].effect[STICK_SHAKER].periodic.magnitude = 0x4000;
+			devices[i].effect[STICK_SHAKER].periodic.magnitude = 32767 * devices[i].shaker_gain;
 			devices[i].effect[STICK_SHAKER].periodic.attack_length = 300;	// 0.3 sec fade in
 			devices[i].effect[STICK_SHAKER].periodic.fade_length = 300;	// 0.3 sec fade out
 
@@ -426,42 +497,72 @@ void create_effects(void)
 			if (devices[i].effectId[STICK_SHAKER] < 0) {
 				printf("UPLOADING EFFECT ERROR: %s\n", SDL_GetError());
 				devices[i].effectId[STICK_SHAKER] = -1;
-				devices[i].supported &= ~SDL_HAPTIC_SINE;
+				//devices[i].supported &= ~SDL_HAPTIC_SINE;
 			}
 		}
+
+		// Ground (asphalt) rumble effect
+		if (devices[i].supported & SDL_HAPTIC_SAWTOOTHDOWN && devices[i].rumble_gain > 0.001) {
+			printf("\tGround rumble\n");
+			devices[i].effect[GROUND_NOTCH].type = SDL_HAPTIC_SAWTOOTHDOWN;
+			devices[i].effect[GROUND_NOTCH].periodic.direction.type = SDL_HAPTIC_POLAR;
+			devices[i].effect[GROUND_NOTCH].periodic.direction.dir[0] = 0;
+			devices[i].effect[GROUND_NOTCH].periodic.direction.dir[1] = 0;
+			devices[i].effect[GROUND_NOTCH].periodic.direction.dir[2] = 0;
+			devices[i].effect[GROUND_NOTCH].periodic.length = SDL_HAPTIC_INFINITY;
+			devices[i].effect[GROUND_NOTCH].periodic.delay = 0;
+			devices[i].effect[GROUND_NOTCH].periodic.period = 1000;	// Temporary placeholder 1 s
+			devices[i].effect[GROUND_NOTCH].periodic.magnitude = (int)(devices[i].rumble_gain * 32767);
+			devices[i].effect[GROUND_NOTCH].periodic.offset = devices[i].effect[GROUND_NOTCH].periodic.magnitude / 2;
+			devices[i].effect[GROUND_NOTCH].periodic.phase = 0;
+			devices[i].effect[GROUND_NOTCH].periodic.attack_length = 0;
+			devices[i].effect[GROUND_NOTCH].periodic.attack_level = 0;
+			devices[i].effect[GROUND_NOTCH].periodic.fade_length = 0;
+			devices[i].effect[GROUND_NOTCH].periodic.fade_level = 0;
+
+			devices[i].effectId[GROUND_NOTCH] = SDL_HapticNewEffect(devices[i].device, &devices[i].effect[GROUND_NOTCH]);
+			if (devices[i].effectId[GROUND_NOTCH] < 0) {
+				printf("UPLOADING GROUND RUMBLE EFFECT ERROR: %s\n", SDL_GetError());
+				devices[i].effectId[GROUND_NOTCH] = -1;
+				//devices[i].supported &= ~SDL_HAPTIC_CONSTANT;
+			}
+		}
+
 		// X axis
 		if (devices[i].supported & SDL_HAPTIC_CONSTANT && devices[i].axes > 0) {
 			devices[i].effect[CONST_X].type = SDL_HAPTIC_CONSTANT;
 			devices[i].effect[CONST_X].constant.direction.type = SDL_HAPTIC_CARTESIAN;
-			devices[i].effect[CONST_X].constant.direction.dir[0] = 0x1000;
+			devices[i].effect[CONST_X].constant.direction.dir[0] = 1;
 			devices[i].effect[CONST_X].constant.direction.dir[1] = 0;
 			devices[i].effect[CONST_X].constant.direction.dir[2] = 0;
-			devices[i].effect[CONST_X].constant.length = 60000;	// By default constant fore is always applied
-			devices[i].effect[CONST_X].constant.level = 0x1000;
+			devices[i].effect[CONST_X].constant.length = SDL_HAPTIC_INFINITY;
+			devices[i].effect[CONST_X].constant.level = 0x7000;
 
 			devices[i].effectId[CONST_X] = SDL_HapticNewEffect(devices[i].device, &devices[i].effect[CONST_X]);
 			if (devices[i].effectId[CONST_X] < 0) {
 				printf("UPLOADING CONST_X EFFECT ERROR: %s\n", SDL_GetError());
 				devices[i].effectId[CONST_X] = -1;
-				devices[i].supported &= ~SDL_HAPTIC_CONSTANT;
+				// devices[i].supported &= ~SDL_HAPTIC_CONSTANT;
 			}
+			printf("\tConstant force X: %d\n", devices[i].effectId[CONST_X]);
 		}
 		// Y axis
 		if (devices[i].supported & SDL_HAPTIC_CONSTANT && devices[i].axes > 1) {
 			devices[i].effect[CONST_Y].type = SDL_HAPTIC_CONSTANT;
 			devices[i].effect[CONST_Y].constant.direction.type = SDL_HAPTIC_CARTESIAN;
 			devices[i].effect[CONST_Y].constant.direction.dir[0] = 0;
-			devices[i].effect[CONST_Y].constant.direction.dir[1] = -0x1000;
+			devices[i].effect[CONST_Y].constant.direction.dir[1] = -1;
 			devices[i].effect[CONST_Y].constant.direction.dir[2] = 0;
-			devices[i].effect[CONST_Y].constant.length = 60000;	// By default constant fore is always applied
-			devices[i].effect[CONST_Y].constant.level = 0x1000;
+			devices[i].effect[CONST_Y].constant.length = SDL_HAPTIC_INFINITY;
+			devices[i].effect[CONST_Y].constant.level = 0x7000;
 
 			devices[i].effectId[CONST_Y] = SDL_HapticNewEffect(devices[i].device, &devices[i].effect[CONST_Y]);
 			if (devices[i].effectId[CONST_Y] < 0) {
 				printf("UPLOADING CONST_Y EFFECT ERROR: %s\n", SDL_GetError());
 				devices[i].effectId[CONST_Y] = -1;
-				devices[i].supported &= ~SDL_HAPTIC_CONSTANT;
+				// devices[i].supported &= ~SDL_HAPTIC_CONSTANT;
 			}
+			printf("\tConstant force Y: %d\n", devices[i].effectId[CONST_Y]);
 		}
 		// Z axis
 		if (devices[i].supported & SDL_HAPTIC_CONSTANT && devices[i].axes > 2) {
@@ -469,16 +570,17 @@ void create_effects(void)
 			devices[i].effect[CONST_Z].constant.direction.type = SDL_HAPTIC_CARTESIAN;
 			devices[i].effect[CONST_Z].constant.direction.dir[0] = 0;
 			devices[i].effect[CONST_Z].constant.direction.dir[1] = 0;
-			devices[i].effect[CONST_Z].constant.direction.dir[2] = 0x1000;
-			devices[i].effect[CONST_Z].constant.length = 60000;	// By default constant fore is always applied
+			devices[i].effect[CONST_Z].constant.direction.dir[2] = 1;	// Up?
+			devices[i].effect[CONST_Z].constant.length = SDL_HAPTIC_INFINITY;
 			devices[i].effect[CONST_Z].constant.level = 0x1000;
 
 			devices[i].effectId[CONST_Z] = SDL_HapticNewEffect(devices[i].device, &devices[i].effect[CONST_Z]);
 			if (devices[i].effectId[CONST_Z] < 0) {
-				printf("UPLOADING CONST_Y EFFECT ERROR: %s\n", SDL_GetError());
+				printf("UPLOADING CONST_Z EFFECT ERROR: %s\n", SDL_GetError());
 				devices[i].effectId[CONST_Z] = -1;
-				devices[i].supported &= ~SDL_HAPTIC_CONSTANT;
+				// devices[i].supported &= ~SDL_HAPTIC_CONSTANT;
 			}
+			printf("\tConstant force Z: %d\n", devices[i].effectId[CONST_Z]);
 		}
 
 	}
@@ -486,41 +588,58 @@ void create_effects(void)
 
 void reload_effect(hapticDevice * device, SDL_HapticEffect * effect, int *effectId, bool run)
 {
-	if (!device->device || !device->open)
+	if (!device->device || !device->open) {
+		printf("Error: device not open!\n");
 		return;
+	}
 
 	if (SDL_HapticUpdateEffect(device->device, *effectId, effect) < 0)
 		printf("Update error: %s\n", SDL_GetError());
-	if (run)
+	if (run) {
+		printf("Running effect %d\n", *effectId);
 		if (SDL_HapticRunEffect(device->device, *effectId, 1) < 0)
 			printf("Run error: %s\n", SDL_GetError());
+	}
 }
+
+static UDPpacket *fg_packet = NULL;
 
 void read_fg(void)
 {
 	int reconf, read;
 	const char *p;
+	effectParams params;
 
-	p = fgfsread(client_sock, TIMEOUT);
+	if(!fg_packet)
+		fg_packet = SDLNet_AllocPacket(512);
+	if(!fg_packet)
+		return;
+
+	//p = fgfsread(client_sock, TIMEOUT);
+	if(SDLNet_UDP_Recv(server_sock, fg_packet) < 1)
+		return;	// No data received
+
+	p = (char *)fg_packet->data;
 	if (!p)
 		return;		// Null pointer, read failed
 
-	memset(&new_params, 0, sizeof(effectParams));
+	memset(&params, 0, sizeof(effectParams));
 
 	// Divide the buffer into chunks
-	read = sscanf(p, "%d|%f|%f|%f|%f|%f|%f|%d|%f", &reconf,
-		      &new_params.pilot[0], &new_params.pilot[1], &new_params.pilot[2],
-		      &new_params.stick[0], &new_params.stick[1], &new_params.stick[2],
-		      &new_params.shaker_trigger, &new_params.rumble_period);
+	read = sscanf(p, "%d|%f|%f|%f|%f|%f|%f|%f|%f|%f|%d|%f", &reconf,
+		      &params.pilot[0], &params.pilot[1], &params.pilot[2],
+		      &params.stick[0], &params.stick[1], &params.stick[2],
+		      &params.trim[0], &params.trim[1], &params.trim[2],
+		      &params.shaker_trigger, &params.rumble_period);
 
-	if (read != 9) {
+	if (read != 12) {
 		printf("Error reading generic I/O!\n");
 		return;
 	}
-	// printf("%s, %d\n", p, reconf);
+	//printf("%s", p);
+	//printf("%d\n", reconf);
 
-	// Do it the easy way...
-	// memcpy(&devices[0].params, &new_params, sizeof(effectParams));
+	memcpy(&new_params, &params, sizeof(effectParams));
 
 	if (reconf & 1)
 		reconf_request = true;
@@ -531,14 +650,55 @@ void test_effects(void)
 	unsigned int start;
 	unsigned int runtime = 0.0;
 	unsigned int dt;
+	bool first_start = true;
 
 	for (int i = 0; i < num_devices; i++) {
 		printf("\nTesting device number %d, %s.\n", i + 1, devices[i].name);
 		printf("HOLD FIRMLY TO YOUR JOYSTICK DURING THE TEST!\n\n");
-		if (devices[i].supported & SDL_HAPTIC_CONSTANT) {
-			printf("Press [enter] to start constant force test.\n");
+
+		if (devices[i].effectId[SPRING] != -1) {
+			signed short strength = 0;
+
+			printf("Press [enter] to start spring test (10000 seconds).\n");
 			getchar();
 
+			first_start = true;
+			start = SDL_GetTicks();
+			do {
+				runtime = SDL_GetTicks();
+				dt = runtime - start;
+
+				if(dt < 3000) strength = 0;
+				else if(dt < 6000) strength = 32760;
+				else if(dt < 9000) strength = 16000;
+				else strength = 32760;
+
+				printf("Coeff: %d\n", strength);
+
+				devices[i].effect[SPRING].condition.left_coeff[0] = strength;
+				devices[i].effect[SPRING].condition.right_coeff[0] = strength;
+				devices[i].effect[SPRING].condition.left_coeff[1] = strength;
+				devices[i].effect[SPRING].condition.right_coeff[1] = strength;
+				devices[i].effect[SPRING].condition.left_coeff[2] = strength;
+				devices[i].effect[SPRING].condition.right_coeff[2] = strength;
+
+				reload_effect(&devices[i], &devices[i].effect[SPRING], &devices[i].effectId[SPRING], first_start);
+
+				SDL_Delay(200);
+				first_start = false;
+			} while (runtime < start + 10000);
+
+			if (devices[i].effectId[SPRING] != -1) SDL_HapticStopEffect(devices[i].device, devices[i].effectId[SPRING]);
+
+		} else
+			printf("Skipping spring test: Not supported or effect creation was failed\n");
+
+
+		if (devices[i].supported & SDL_HAPTIC_CONSTANT) {
+			printf("Press [enter] to start constant force test (6 seconds).\n");
+			getchar();
+
+			first_start = true;
 			start = SDL_GetTicks();
 			do {
 				runtime = SDL_GetTicks();
@@ -554,23 +714,29 @@ void test_effects(void)
 
 				if (devices[i].axes > 0 && devices[i].effectId[CONST_X] != -1) {
 					devices[i].effect[CONST_X].constant.level = (signed short)clamp(x, -32760.0, 32760.0);
-					reload_effect(&devices[i], &devices[i].effect[CONST_X], &devices[i].effectId[CONST_X], true);
+					reload_effect(&devices[i], &devices[i].effect[CONST_X], &devices[i].effectId[CONST_X], first_start);
 				}
 				if (devices[i].axes > 1 && devices[i].effectId[CONST_Y] != -1) {
 					devices[i].effect[CONST_Y].constant.level = (signed short)clamp(y, -32760.0, 32760.0);
-					reload_effect(&devices[i], &devices[i].effect[CONST_Y], &devices[i].effectId[CONST_Y], true);
+					reload_effect(&devices[i], &devices[i].effect[CONST_Y], &devices[i].effectId[CONST_Y], first_start);
 				}
 				if (devices[i].axes > 2 && devices[i].effectId[CONST_Z] != -1) {
 					devices[i].effect[CONST_Z].constant.level = (signed short)clamp(z, -32760.0, 32760.0);
-					reload_effect(&devices[i], &devices[i].effect[CONST_Z], &devices[i].effectId[CONST_Z], true);
+					reload_effect(&devices[i], &devices[i].effect[CONST_Z], &devices[i].effectId[CONST_Z], first_start);
 				}
+				first_start = false;
 				SDL_Delay(100);
 			} while (runtime < start + 6500);
+
+			if (devices[i].effectId[CONST_X] != -1) SDL_HapticStopEffect(devices[i].device, devices[i].effectId[CONST_X]);
+			if (devices[i].effectId[CONST_Y] != -1) SDL_HapticStopEffect(devices[i].device, devices[i].effectId[CONST_Y]);
+			if (devices[i].effectId[CONST_Z] != -1) SDL_HapticStopEffect(devices[i].device, devices[i].effectId[CONST_Z]);
+
 		} else
 			printf("Skipping constant force test: Not supported or effect creation was failed\n");
 
 		if ((devices[i].supported & SDL_HAPTIC_SINE) && devices[i].effectId[STICK_SHAKER] != -1) {
-			printf("Press [enter] to start rumble test.\n");
+			printf("Press [enter] to start rumble test (2 seconds).\n");
 			getchar();
 
 			reload_effect(&devices[i], &devices[i].effect[STICK_SHAKER], &devices[i].effectId[STICK_SHAKER], true);
@@ -579,7 +745,33 @@ void test_effects(void)
 			do {
 				runtime = SDL_GetTicks();
 				SDL_Delay(100);
-			} while (runtime < start + 5000);
+			} while (runtime < start + 2000);
+
+			if (devices[i].effectId[STICK_SHAKER] != -1) SDL_HapticStopEffect(devices[i].device, devices[i].effectId[STICK_SHAKER]);
+
+		} else
+			printf("Skipping rumble test: Not supported or effect creation was failed\n");
+
+		if (devices[i].effectId[GROUND_NOTCH] != -1) {
+			printf("Press [enter] to start ground notch test (6 seconds).\n");
+			getchar();
+
+			first_start = true;
+			start = SDL_GetTicks();
+			do {
+				runtime = SDL_GetTicks();
+				dt = runtime - start;
+
+				devices[i].effect[GROUND_NOTCH].periodic.period = 100 + (6000 - dt) / 15;
+
+				reload_effect(&devices[i], &devices[i].effect[GROUND_NOTCH], &devices[i].effectId[GROUND_NOTCH], first_start);
+
+				SDL_Delay(100);
+				first_start = false;
+			} while (runtime < start + 6000);
+
+			if (devices[i].effectId[GROUND_NOTCH] != -1) SDL_HapticStopEffect(devices[i].device, devices[i].effectId[GROUND_NOTCH]);
+
 		} else
 			printf("Skipping rumble test: Not supported or effect creation was failed\n");
 
@@ -602,6 +794,9 @@ int main(int argc, char **argv)
 	unsigned int runtime = 0;
 	unsigned int dt = 0;
 	bool test_mode = false;
+	Uint32 fgfs_address;
+	bool start_effects = true;
+	bool old_reconf = false;
 
 	// Handlers for ctrl+c etc quitting methods
 	signal_handler.sa_handler = abort_execution;
@@ -629,6 +824,7 @@ int main(int argc, char **argv)
 			test_mode = true;
 		}
 	}
+
 	// Initialize SDL haptics
 	init_haptic();
 
@@ -640,6 +836,12 @@ int main(int argc, char **argv)
 		abort_execution(0);
 	}
 
+	// Initialize network
+	if(SDLNet_Init() < 0) {
+		printf("Could not initialize network: %s\n", SDLNet_GetError());
+		abort_execution(-1);
+	}
+
 	socketset = SDLNet_AllocSocketSet(2);
 	if (!socketset) {
 		printf("Unable to create socket set: %s\n", SDLNet_GetError());
@@ -647,22 +849,29 @@ int main(int argc, char **argv)
 	}
 	// Wait for a connection from flightgear generic io
 	printf("\n\nWaiting for flightgear generic IO at port %d, please run Flight Gear now!\n", DFLTPORT + 1);
-	server_sock = fgfsconnect(DFLTHOST, DFLTPORT + 1, true);
+	server_sock = fgfs_udp_reader(DFLTPORT + 1);
 	if (!server_sock) {
-		printf("Failed to connect!\n");
+		printf("Failed to create UDP server!\n");
 		abort_execution(-1);
 	}
 
-	printf("Got connection, sending haptic details through telnet at port %d\n", DFLTPORT);
+	fgfs_address = fgfs_wait_packet(server_sock);
+	if(!fgfs_address) {
+		printf("Could not determine fgfs address!\n");
+		abort_execution(-1);
+	}
+	printf("Got connection, sending haptic details through telnet\n");
+	printf("Host: %d.%d.%d.%d Port: %d\n", fgfs_address & 0xFF, (fgfs_address >> 8) & 0xFF, 
+		(fgfs_address >> 16) & 0xFF, (fgfs_address >> 24) & 0xFF, DFLTPORT);
 
 	// Connect to flightgear using telnet
-	telnet_sock = fgfsconnect(DFLTHOST, DFLTPORT, false);
+	telnet_sock = fgfsconnect(fgfs_address, DFLTPORT);
 	if (!telnet_sock) {
 		printf("Could not connect to flightgear with telnet!\n");
 		abort_execution(-1);
 	}
 	// Add sockets to a socket set for polling/selecting
-	SDLNet_TCP_AddSocket(socketset, client_sock);
+	//SDLNet_TCP_AddSocket(socketset, client_sock);
 	SDLNet_TCP_AddSocket(socketset, telnet_sock);
 
 	// Switch to data mode
@@ -695,6 +904,7 @@ int main(int argc, char **argv)
 		memset((void *)&devices[i].params, 0, sizeof(effectParams));
 
 		// Read new parameters
+		old_reconf = reconf_request;
 		read_fg();
 
 		// If parameters have changed, apply them
@@ -702,23 +912,43 @@ int main(int argc, char **argv)
 			if (!devices[i].device || !devices[i].open)
 				continue;	// Break if device is not opened correctly
 
+			// Ground rumble in normal mode
+			devices[i].params.rumble_period = new_params.rumble_period;
+			if(devices[i].rumble_mode == MODE_NORMAL) {
+				if (new_params.rumble_period > 0.00001) {
+					devices[i].effect[GROUND_NOTCH].periodic.period = new_params.rumble_period;
+					if(oldParams[i].rumble_period < 0.00001) {
+						// Start the rumble effect (previously was OFF, now ON
+						reload_effect(&devices[i], &devices[i].effect[GROUND_NOTCH], &devices[i].effectId[GROUND_NOTCH], true);
+					} else {
+						// Update period on running effect
+						reload_effect(&devices[i], &devices[i].effect[GROUND_NOTCH], &devices[i].effectId[GROUND_NOTCH], false);
+					}
+				} else if(oldParams[i].rumble_period > 0.00001) {
+					// Stop rumble effect on liftoff (previously effect was ON, now OFF)
+					SDL_HapticStopEffect(devices[i].device, devices[i].effectId[GROUND_NOTCH]);
+				}
+			}
+
 			// Constant forces (stick forces, pilot G forces
 			if ((devices[i].supported & SDL_HAPTIC_CONSTANT)) {
-				// Stick forces with axis mapping
-				if (devices[i].stick_axes[0] >= 0)
-					devices[i].params.x = new_params.stick[devices[i].stick_axes[0]] * devices[i].stick_gain;
-				if (devices[i].stick_axes[1] >= 0)
-					devices[i].params.y = new_params.stick[devices[i].stick_axes[1]] * devices[i].stick_gain;
-				if (devices[i].stick_axes[2] >= 0)
-					devices[i].params.z = new_params.stick[devices[i].stick_axes[2]] * devices[i].stick_gain;
-
 				// Pilot forces
-				if (devices[i].stick_axes[0] >= 0)
-					devices[i].params.x += new_params.stick[devices[i].stick_axes[0]] * devices[i].stick_gain;
+				if (devices[i].pilot_axes[0] >= 0)
+					devices[i].params.x = new_params.pilot[devices[i].pilot_axes[0]] * devices[i].pilot_gain;
 				if (devices[i].pilot_axes[1] >= 0)
-					devices[i].params.y += new_params.pilot[devices[i].pilot_axes[1]] * devices[i].pilot_gain;
+					devices[i].params.y = new_params.pilot[devices[i].pilot_axes[1]] * devices[i].pilot_gain;
 				if (devices[i].pilot_axes[2] >= 0)
-					devices[i].params.z += new_params.pilot[devices[i].pilot_axes[2]] * devices[i].pilot_gain;
+					devices[i].params.z = new_params.pilot[devices[i].pilot_axes[2]] * devices[i].pilot_gain;
+
+				if (devices[i].stick_mode == MODE_ALTERNATE) {
+					// Stick forces with axis mapping
+					if (devices[i].stick_axes[0] >= 0)
+						devices[i].params.x += new_params.stick[devices[i].stick_axes[0]] * devices[i].stick_gain;
+					if (devices[i].stick_axes[1] >= 0)
+						devices[i].params.y += new_params.stick[devices[i].stick_axes[1]] * devices[i].stick_gain;
+					if (devices[i].stick_axes[2] >= 0)
+						devices[i].params.z += new_params.stick[devices[i].stick_axes[2]] * devices[i].stick_gain;
+				}
 
 				devices[i].params.x *= 32760.0;
 				devices[i].params.y *= 32760.0;
@@ -731,46 +961,70 @@ int main(int argc, char **argv)
 				devices[i].params.y = devices[i].params.y * g1 + oldParams[i].y * g2;
 				devices[i].params.z = devices[i].params.z * g1 + oldParams[i].z * g2;
 
-				// Add ground rumble
+				// Add ground rumble in alternate mode
 				float rumble = 0.0;
-				if (new_params.rumble_period > 0.00001) {
+				if (new_params.rumble_period > 0.00001 && devices[i].rumble_mode == MODE_ALTERNATE) {
+					// Add the rumble to constant force every now and then
 					if ((runtime - devices[i].last_rumble) > new_params.rumble_period) {
 						rumble = devices[i].rumble_gain * 32760.0;
 						devices[i].last_rumble = runtime;
 					}
 				}
 
-				if (devices[i].axes > 0 && devices[i].effectId[CONST_X] != -1) {
+				// Apply the force
+				if (devices[i].effectId[CONST_X] != -1) {
 					devices[i].effect[CONST_X].constant.level =
 					    (signed short)clamp(devices[i].params.x, -32760.0, 32760.0);
-					reload_effect(&devices[i], &devices[i].effect[CONST_X], &devices[i].effectId[CONST_X], true);
+					reload_effect(&devices[i], &devices[i].effect[CONST_X], &devices[i].effectId[CONST_X], start_effects);
 				}
-				if (devices[i].axes > 1 && devices[i].effectId[CONST_Y] != -1) {
+				if (devices[i].effectId[CONST_Y] != -1) {
 					devices[i].effect[CONST_Y].constant.level =
 					    (signed short)clamp(devices[i].params.y + rumble, -32760.0, 32760.0);
-					reload_effect(&devices[i], &devices[i].effect[CONST_Y], &devices[i].effectId[CONST_Y], true);
+					reload_effect(&devices[i], &devices[i].effect[CONST_Y], &devices[i].effectId[CONST_Y], start_effects);
 				}
-				if (devices[i].axes > 2 && devices[i].effectId[CONST_Z] != -1) {
+				if (devices[i].effectId[CONST_Z] != -1) {
 					devices[i].effect[CONST_Z].constant.level =
-					    (signed short)clamp(devices[i].params.z, -32760.0, 32760.0);;
-					reload_effect(&devices[i], &devices[i].effect[CONST_Z], &devices[i].effectId[CONST_Z], true);
+					    (signed short)clamp(devices[i].params.z, -32760.0, 32760.0);
+					reload_effect(&devices[i], &devices[i].effect[CONST_Z], &devices[i].effectId[CONST_Z], start_effects);
 				}
 				// printf("dt: %d  X: %.6f  Y: %.6f\n", (unsigned int)dt, devices[i].params.x, devices[i].params.y);
 			}
-			// Stick shaker trigger
-			if ((devices[i].supported & SDL_HAPTIC_SINE) && devices[i].effectId[STICK_SHAKER] != -1) {
-				if (new_params.shaker_trigger && !oldParams[i].shaker_trigger)
-					reload_effect(&devices[i], &devices[i].effect[STICK_SHAKER], &devices[i].effectId[STICK_SHAKER],
-						      true);
-				else if (!new_params.shaker_trigger && oldParams[i].shaker_trigger)
-					SDL_HapticStopEffect(devices[i].device, devices[i].effectId[STICK_SHAKER]);
+
+			// Spring effect if stick forces in normal mode
+			if (devices[i].effectId[SPRING] != -1 && devices[i].stick_mode == MODE_NORMAL) {
+				// Set center point according to trim
+				for(int j=0; j<AXES; j++) {
+					devices[i].effect[SPRING].condition.center[j] = (signed short)clamp(new_params.trim[devices[i].stick_axes[j]]*32767, -32760, 32760);
+
+					// Note! the axis are inverted when they come from flightgear, so invert here again
+					devices[i].effect[SPRING].condition.left_coeff[j] =
+						-(signed short)clamp(new_params.stick[devices[i].stick_axes[j]] * devices[i].stick_gain*32767, -32760, 32760);
+					devices[i].effect[SPRING].condition.right_coeff[j] =
+						-(signed short)clamp(new_params.stick[devices[i].stick_axes[j]] * devices[i].stick_gain*32767, -32760, 32760);
+				}
+
+				reload_effect(&devices[i], &devices[i].effect[SPRING], &devices[i].effectId[SPRING], start_effects);
 			}
+
+
+			// Stick shaker trigger
+			if (devices[i].effectId[STICK_SHAKER] != -1) {
+				if (new_params.shaker_trigger && !oldParams[i].shaker_trigger) {
+					reload_effect(&devices[i], &devices[i].effect[STICK_SHAKER], &devices[i].effectId[STICK_SHAKER], true);
+				} else if (!new_params.shaker_trigger && oldParams[i].shaker_trigger) {
+					SDL_HapticStopEffect(devices[i].device, devices[i].effectId[STICK_SHAKER]);
+				}
+				devices[i].params.shaker_trigger = new_params.shaker_trigger;
+			}
+
+			start_effects = false;
 		}
 
-		if (reconf_request) {
-			reconf_request = false;
+		if (reconf_request && !old_reconf) {
+			//reconf_request = false;
 			read_devices();
 			create_effects();
+			start_effects = true;
 		}
 
 		SDL_Delay(10);
@@ -781,8 +1035,9 @@ int main(int argc, char **argv)
 	fgfsclose(telnet_sock);
 
 	// Close generic connection
-	fgfsclose(client_sock);
-	fgfsclose(server_sock);
+	//fgfsclose(client_sock);
+	//fgfsclose(server_sock);
+	SDLNet_UDP_Close(server_sock);
 
 	SDLNet_FreeSocketSet(socketset);
 
@@ -815,9 +1070,14 @@ void abort_execution(int signal)
 	fgfswrite(telnet_sock, "quit");
 	fgfsclose(telnet_sock);
 
+	if(!fg_packet)
+		SDLNet_FreePacket(fg_packet);
+
+
 	// Adn generic
-	fgfsclose(client_sock);
-	fgfsclose(server_sock);
+	//fgfsclose(client_sock);
+	//fgfsclose(server_sock);
+	SDLNet_UDP_Close(server_sock);
 
 	SDLNet_FreeSocketSet(socketset);
 
@@ -968,14 +1228,16 @@ void fgfsflush(TCPsocket sock)
 	}
 }
 
-TCPsocket fgfsconnect(const char *hostname, const int port, bool server)
+TCPsocket fgfsconnect(const Uint32 host, const Uint16 port)
 {
 	IPaddress serv_addr, cli_addr;
 	TCPsocket _sock, _clientsock;
 	time_t start;
 
-	if (!server)		// Act as a client -> connect to address
+	if (host)		// Act as a client -> connect to address
 	{
+		char hostname[32] = {0};
+		snprintf(hostname, 31, "%d.%d.%d.%d", host & 0xFF, (host >> 8) & 0xFF, (host >> 16) & 0xFF, (host >> 24) & 0xFF);
 		if (SDLNet_ResolveHost(&cli_addr, hostname, port) == -1) {
 			printf("Error in fgfsconnect, resolve host: %s\n", SDLNet_GetError());
 			return NULL;
@@ -1012,8 +1274,53 @@ TCPsocket fgfsconnect(const char *hostname, const int port, bool server)
 			return NULL;
 		}
 
-		client_sock = _clientsock;
+		//client_sock = _clientsock;
 
 		return _sock;
 	}
+}
+
+UDPsocket fgfs_udp_reader(const Uint16 port)
+{
+	UDPsocket _sock;
+
+	_sock = SDLNet_UDP_Open(port);
+	if(!_sock) {
+		printf("Error in fgfs_udp_reader, open: %s\n", SDLNet_GetError());
+		return NULL;
+	}
+
+	return _sock;
+}
+
+Uint32 fgfs_wait_packet(UDPsocket socket)
+{
+	time_t start;
+	UDPpacket *p;
+	int ret;
+	Uint32 host;
+
+	p = SDLNet_AllocPacket(512);
+	if(!p) {
+		printf("Memory allocation error in fgfs_wait_packet: %s\n", SDLNet_GetError());
+		return 0;
+	}
+
+	start = clock();
+	do {
+		SDL_Delay(50);
+		ret = SDLNet_UDP_Recv(socket, p);
+	} while (!ret && clock() < (start + CONN_TIMEOUT * CLOCKS_PER_SEC));
+
+	if(!ret) {
+		printf("Timeout in fgfs_wait_packet\n");
+		SDLNet_FreePacket(p);
+		return 0;
+	}
+
+	host = p->address.host;
+
+	SDLNet_FreePacket(p);
+
+	return host;
 }

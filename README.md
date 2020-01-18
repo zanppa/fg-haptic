@@ -89,12 +89,15 @@ inside Flight Gear's data directory.
 Running
 -------
 
-First run ```fg-haptic(.exe)```.
+Launch flightgear with at least the following options:
 
-Then launch flightgear with at least the following options:
+    fgfs --telnet=5401 --generic=socket,out,20,localhost,5402,udp,ff-protocol
 
-    fgfs --telnet=5401 --generic=socket,out,20,localhost,5402,tcp,ff-protocol
+Then run ```fg-haptic(.exe)```.
 
+You can also launch them in different order (fg-haptic first). Also you can 
+replace localhost with any other address, fg-haptic tries to determine the
+FlightGear's address from the first received packet.
 
 If FlightGear's menu is not visible, press F10 to display it.
 In the Help menu you can find Force feedback options.
