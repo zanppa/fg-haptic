@@ -2,20 +2,24 @@
 var update_interval = 0.05;
 
 # Defaults constants, will be overwritten in init
+# These are calculated roughly for C172, which has
+# aileron angles of 20 deg positive and -14 deg negative I think
+# and Vne around 150 knots
+# Stall AoA is assumed to be around 17-18 degrees, and stalls at about 22 deg
 var aileron_max_deflection = 20.0*0.01745329;
 var elevator_max_deflection = 20.0*0.01745329;
 var rudder_max_deflection = 20.0*0.01745329;
-var aileron_gain = 0.1;
-var elevator_gain = 0.1;
+var aileron_gain = 3.0;
+var elevator_gain = 3.0;
 var g_force_gain = 0.003;
-var rudder_gain = 0.1;
+var rudder_gain = 3.0;
 var slip_gain = 1.0;
-var stall_AoA = 18.0*0.01745329;
+var stall_AoA = 22.0*0.01745329;
 var pusher_start_AoA = 900.0*0.01745329;
 var pusher_working_angle = 900.0*0.01745329;
 var wing_shadow_AoA = 900.0*0.01745329;
 var wing_shadow_angle = 900.0*0.01745329;
-var stick_shaker_AoA = 16.0*0.01745329;
+var stick_shaker_AoA = 17.0*0.01745329;
 
 var enable_force_trim_aileron = nil;
 var enable_force_trim_elevator = nil;
@@ -120,11 +124,16 @@ var update_stick_forces = func(path) {
     elevator_force = elevator_force + g_force_gain * g_force;
 
     rudder_force = rudder_force * math.sin(rudder_angle);
-  }  
+  } else {
+    # In normal mode scale according to max deflection to have approximately same scaling as alternate mode
+    aileron_force = aileron_force * math.sin(aileron_max_deflection);
+	elevator_force = elevator_force * math.sin(elevator_max_deflection);
+	rudder_force = rudder_force * math.sin(rudder_max_deflection);
+  }
 
 
   # Stall condition, assuming rudder wont stall
-  # A smooth "step" function going from 0 to 1, i.e. at deep stall
+  # A smooth "step" function going from 1 to 0 at deep stall
   # the stick forces are zero
   var stall_coeff = (AoA / stall_AoA);
   stall_coeff = stall_coeff * stall_coeff * stall_coeff * stall_coeff;
@@ -354,6 +363,8 @@ _setlistener("/sim/signals/nasal-dir-initialized", func {
   props.globals.initNode("/haptic/ground-rumble/gain", 0.0, "DOUBLE");
   props.globals.initNode("/haptic/ground-rumble/mode", 0, "INT");
   
+  props.globals.initNode("/haptic/devices-reconfigured", 0, "DOUBLE");
+
   props.globals.initNode("/haptic/test-mode", 0, "BOOL");
 
  
