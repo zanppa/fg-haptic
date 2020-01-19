@@ -290,6 +290,9 @@ void send_devices(void)
 			fgfswrite(telnet_sock, "set /haptic/device[%d]/autocenter-supported 1", i);
 		}
 	}
+
+	// Tell fgfs that we have reconfigured the property tree for haptic devices
+	fgfswrite(telnet_sock, "set /haptic/devices-reconfigured 1");
 }
 
 void read_devices(void)
@@ -544,7 +547,7 @@ void create_effects(void)
 				devices[i].effectId[CONST_X] = -1;
 				// devices[i].supported &= ~SDL_HAPTIC_CONSTANT;
 			}
-			printf("\tConstant force X: %d\n", devices[i].effectId[CONST_X]);
+			printf("\tConstant force X\n");
 		}
 		// Y axis
 		if (devices[i].supported & SDL_HAPTIC_CONSTANT && devices[i].axes > 1) {
@@ -562,7 +565,7 @@ void create_effects(void)
 				devices[i].effectId[CONST_Y] = -1;
 				// devices[i].supported &= ~SDL_HAPTIC_CONSTANT;
 			}
-			printf("\tConstant force Y: %d\n", devices[i].effectId[CONST_Y]);
+			printf("\tConstant force Y\n");
 		}
 		// Z axis
 		if (devices[i].supported & SDL_HAPTIC_CONSTANT && devices[i].axes > 2) {
@@ -580,7 +583,7 @@ void create_effects(void)
 				devices[i].effectId[CONST_Z] = -1;
 				// devices[i].supported &= ~SDL_HAPTIC_CONSTANT;
 			}
-			printf("\tConstant force Z: %d\n", devices[i].effectId[CONST_Z]);
+			printf("\tConstant force Z\n");
 		}
 
 	}
@@ -604,7 +607,7 @@ void reload_effect(hapticDevice * device, SDL_HapticEffect * effect, int *effect
 
 static UDPpacket *fg_packet = NULL;
 
-void read_fg(void)
+void read_fg_generic(void)
 {
 	int reconf, read;
 	const char *p;
@@ -805,9 +808,9 @@ int main(int argc, char **argv)
 	sigaction(SIGINT, &signal_handler, NULL);
 	sigaction(SIGQUIT, &signal_handler, NULL);
 
-	printf("fg-haptic version 0.5\n");
+	printf("fg-haptic version 0.6\n");
 	printf("Force feedback support for Flight Gear\n");
-	printf("Copyright 2011, 2014 Lauri Peltonen, released under GPLv2 or later\n\n");
+	printf("Copyright 2011, 2014, 2020 Lauri Peltonen, released under GPLv2 or later\n\n");
 
 	if (argc > 1) {
 		name = argv[1];
@@ -905,7 +908,7 @@ int main(int argc, char **argv)
 
 		// Read new parameters
 		old_reconf = reconf_request;
-		read_fg();
+		read_fg_generic();
 
 		// If parameters have changed, apply them
 		for (int i = 0; i < num_devices; i++) {
