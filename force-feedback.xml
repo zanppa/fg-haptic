@@ -167,23 +167,30 @@
         </group>
 
         <!-- Mode selection combo -->
-        <combo>
-          <name>control-surface-mode</name>
-          <!-- <width>400</width> -->
-          <property>/sim/gui/dialogs/force-feedback/control-surface-mode</property>
-          <halign>fill</halign>
-          <stretch>1</stretch>
-          <value>Normal</value>
-          <value>Alternate</value>
-          <binding>
-            <command>dialog-apply</command>
-            <object-name>control-surface-mode</object-name>
-          </binding>
-          <binding>
-            <command>nasal</command>
-            <script>applyChanges();</script>
-          </binding>
-        </combo>
+		<group>
+		  <layout>hbox</layout>
+		  <text>
+		    <label>Mode</label>
+			<enable><property>/sim/gui/dialogs/force-feedback/control-surface-enable</property></enable>
+		  </text>
+          <combo>
+            <name>control-surface-mode</name>
+            <!-- <width>400</width> -->
+            <property>/sim/gui/dialogs/force-feedback/control-surface-mode</property>
+            <halign>fill</halign>
+            <stretch>1</stretch>
+            <value>asdl</value>
+            <value>basd</value>
+            <binding>
+              <command>dialog-apply</command>
+              <object-name>control-surface-mode</object-name>
+            </binding>
+            <binding>
+              <command>nasal</command>
+              <script>applyChanges();</script>
+            </binding>
+          </combo>
+		</group>
 
 
         <!-- Slider -->
@@ -538,24 +545,27 @@
         <hrule><stretch>1</stretch></hrule>
       </group>
 
-      <combo>
-        <name>ground-rumble-mode</name>
-        <!-- <width>400</width> -->
-        <property>/sim/gui/dialogs/force-feedback/ground-rumble-mode</property>
-        <halign>fill</halign>
-        <stretch>1</stretch>
-        <value>Normal</value>
-        <value>Alternate</value>
-        <binding>
-          <command>dialog-apply</command>
-          <object-name>ground-rumble-mode</object-name>
-        </binding>
-        <binding>
-          <command>nasal</command>
-          <script>applyChanges();</script>
-        </binding>
-      </combo>
-
+	  <group>
+	    <layout>hbox</layout>
+	    <text><label>Mode</label><enable><property>/sim/gui/dialogs/force-feedback/ground-rumble-enable</property></enable></text>
+        <combo>
+          <name>ground-rumble-mode</name>
+          <!-- <width>400</width> -->
+          <property>/sim/gui/dialogs/force-feedback/ground-rumble-mode</property>
+          <halign>fill</halign>
+          <stretch>1</stretch>
+          <value>Normal</value>
+          <value>Alternate</value>
+          <binding>
+            <command>dialog-apply</command>
+            <object-name>ground-rumble-mode</object-name>
+          </binding>
+          <binding>
+            <command>nasal</command>
+            <script>applyChanges();</script>
+          </binding>
+        </combo>
+	  </group>
 
       <!-- Slider -->
       <group>
@@ -587,8 +597,11 @@
           <enable><property>/sim/gui/dialogs/force-feedback/ground-rumble-enable</property></enable>
         </text>
       </group>
+	  
+	  <empty><stretch>1</stretch></empty>
+	  
     </group>
-
+	
   </group>
 
 
@@ -597,6 +610,23 @@
 
   <group>
     <layout>hbox</layout>
+	
+	<!-- Save button -->
+    <button>
+      <legend>Save</legend>
+      <binding>
+        <command>nasal</command>
+        <script>save_config();</script>
+      </binding>
+    </button>
+	<!-- Load button -->
+    <button>
+      <legend>Load</legend>
+      <binding>
+        <command>nasal</command>
+        <script>load_config();</script>
+      </binding>
+    </button>
 
     <empty><stretch>1</stretch></empty>
 
@@ -641,7 +671,7 @@
           return node;
 
         foreach (var n; node.getChildren()) {
-          var ret = enable_widgets(n, name, enable);
+          var ret = gui.enable_widgets(n, name, 1);
           if(ret != nil) return ret; # Propagate upwards.
         }
         return nil;
@@ -686,6 +716,7 @@
             #setprop("/haptic/device[" ~ i ~ "]/pilot/x", getprop("/sim/gui/dialogs/force-feedback/pilot-g-x"));
             #setprop("/haptic/device[" ~ i ~ "]/pilot/y", getprop("/sim/gui/dialogs/force-feedback/pilot-g-y"));
             #setprop("/haptic/device[" ~ i ~ "]/pilot/z", getprop("/sim/gui/dialogs/force-feedback/pilot-g-z"));
+
             setprop("/haptic/device[" ~ i ~ "]/stick-force/gain", getprop("/sim/gui/dialogs/force-feedback/control-surface-strength"));
             setprop("/haptic/device[" ~ i ~ "]/stick-force/x", getAxisNumber("/sim/gui/dialogs/force-feedback/control-surface-x", stick_axis));
             setprop("/haptic/device[" ~ i ~ "]/stick-force/y", getAxisNumber("/sim/gui/dialogs/force-feedback/control-surface-y", stick_axis));
@@ -693,18 +724,25 @@
             #setprop("/haptic/device[" ~ i ~ "]/stick-force/x", getprop("/sim/gui/dialogs/force-feedback/control-surface-x"));
             #setprop("/haptic/device[" ~ i ~ "]/stick-force/y", getprop("/sim/gui/dialogs/force-feedback/control-surface-y"));
             #setprop("/haptic/device[" ~ i ~ "]/stick-force/z", getprop("/sim/gui/dialogs/force-feedback/control-surface-z"));
+			var mode = getprop("/sim/gui/dialogs/force-feedback/control-surface-mode");
+			if(mode == "Normal")
+			  setprop("/haptic/device[" ~ i ~ "]/stick-force/mode", 0);
+			else
+			  setprop("/haptic/device[" ~ i ~ "]/stick-force/mode", 1);
+			
             setprop("/haptic/device[" ~ i ~ "]/stick-shaker/gain", getprop("/sim/gui/dialogs/force-feedback/stick-shaker-strength"));
             setprop("/haptic/device[" ~ i ~ "]/stick-shaker/direction", getprop("/sim/gui/dialogs/force-feedback/stick-shaker-direction"));
             setprop("/haptic/device[" ~ i ~ "]/stick-shaker/period", getprop("/sim/gui/dialogs/force-feedback/stick-shaker-period"));
-            setprop("/haptic/device[" ~ i ~ "]/ground-rumble/gain", getprop("/sim/gui/dialogs/force-feedback/ground-rumble-strength"));
-            # setprop("/haptic/device[" ~ i ~ "]/", getprop("/sim/gui/dialogs/force-feedback/"));
-            # setprop("/haptic/device[" ~ i ~ "]/", getprop("/sim/gui/dialogs/force-feedback/"));
 
-            var mode = getprop("/sim/gui/dialogs/force-feedback/control-surface-mode");
-            if(mode == "Normal")
-              setprop("/haptic/device[" ~ i ~ "]/stick-force/mode", 0);
-            else
-              setprop("/haptic/device[" ~ i ~ "]/stick-force/mode", 1);
+            setprop("/haptic/device[" ~ i ~ "]/ground-rumble/gain", getprop("/sim/gui/dialogs/force-feedback/ground-rumble-strength"));
+			mode = getprop("/sim/gui/dialogs/force-feedback/ground-rumble-mode");
+			if(mode == "Normal")
+			  setprop("/haptic/device[" ~ i ~ "]/ground-rumble/mode", 0);
+			else
+			  setprop("/haptic/device[" ~ i ~ "]/ground-rumble/mode", 1);
+
+            # setprop("/haptic/device[" ~ i ~ "]/", getprop("/sim/gui/dialogs/force-feedback/"));
+            # setprop("/haptic/device[" ~ i ~ "]/", getprop("/sim/gui/dialogs/force-feedback/"));
 
             var mode = getprop("/sim/gui/dialogs/force-feedback/ground-rumble-mode");
             if(mode == "Normal")
@@ -720,6 +758,7 @@
 
       var reconfigure = func {
         setprop("/haptic/reconfigure", 1);
+		gui.popupTip("Configuration sent to fg-haptic");
       };
 
       # Fill dialog params with selected device
@@ -784,16 +823,18 @@
         # CONTROL SURFACE FORCES
         setprop("/sim/gui/dialogs/force-feedback/control-surface-enable", "true");
 
-        effect = getprop("/haptic/device[" ~ dev ~ "]/stick-force/mode");
-        if(effect == nil) setprop("/sim/gui/dialogs/force-feedback/control-surface-mode", "Normal");
-        else {
-          if (effect == 0) setprop("/sim/gui/dialogs/force-feedback/control-surface-mode", "Normal");
-          if (effect == 1) setprop("/sim/gui/dialogs/force-feedback/control-surface-mode", "Alternate");
-        }
-
         effect = getprop("/haptic/device[" ~ dev ~ "]/stick-force/gain");
         if(effect == nil) effect = 0;
         setprop("/sim/gui/dialogs/force-feedback/control-surface-strength", effect);
+		
+		var combo = gui.findElementByName(cmdarg(), "control-surface-mode");
+		if(combo != nil) {
+		  combo.removeChildren("value");
+		  if(getprop("/haptic/device[" ~ dev ~ "]/stick-force/normal") == 1)
+		    combo.addChild("value").setValue("Normal");
+		  if(getprop("/haptic/device[" ~ dev ~ "]/stick-force/alternate") == 1)
+		    combo.addChild("value").setValue("Alternate");
+		}
 
         # Axis bindings
         effect = getprop("/haptic/device[" ~ dev ~ "]/stick-force/x");
@@ -841,18 +882,19 @@
         if(effect == nil) effect = 0;
         setprop("/sim/gui/dialogs/force-feedback/ground-rumble-strength", effect);
 
-        effect = getprop("/haptic/device[" ~ dev ~ "]/ground-rumble/mode");
-        if(effect == nil) setprop("/sim/gui/dialogs/force-feedback/ground-rumble-mode", "Normal");
-        else {
-          if (effect == 0) setprop("/sim/gui/dialogs/force-feedback/ground-rumble-mode", "Normal");
-          if (effect == 1) setprop("/sim/gui/dialogs/force-feedback/ground-rumble-mode", "Alternate");
-        }
-
         effect = getprop("/haptic/device[" ~ dev ~ "]/ground-rumble/supported");
         if(effect == nil) setprop("/sim/gui/dialogs/force-feedback/ground-rumble-enable", "false");
         else setprop("/sim/gui/dialogs/force-feedback/ground-rumble-enable", "true");
 
-
+		var combo = gui.findElementByName(cmdarg(), "ground-rumble-mode");
+		if(combo != nil) {
+		  combo.removeChildren("value");
+		  if(getprop("/haptic/device[" ~ dev ~ "]/ground-rumble/normal") == 1)
+		    combo.addChild("value").setValue("Normal");
+		  if(getprop("/haptic/device[" ~ dev ~ "]/ground-rumble/alternate") == 1)
+		    combo.addChild("value").setValue("Alternate");
+		}
+		
         # TODO: Set combo box default/set values
 
         # Disable non existing axis
@@ -891,8 +933,101 @@
             return;
           }
         }
-        # Not found, some kind of error! Let it be as is.
+        # Not found, some kind of error! Leave the dialog alone.
       };
+	  
+	  var save_config = func {
+        # Save configuration of all devices
+		
+		# First apply everything
+		applyChanges();
+		
+		# Then save the haptic tree to file
+		var filename = getprop("/sim/fg-home") ~ "/Export/haptic-config.xml";
+		if(io.write_properties( path: filename, prop: "/haptic" ) != nil) {
+			gui.popupTip("Configuration saved succesfully");
+		} else {
+			gui.popupTip("Error while saving configuration");
+		}
+	  };
+	  
+	  var load_config = func {
+	    # Load configuration from exported XML
+		
+		var filename = getprop("/sim/fg-home") ~ "/Export/haptic-config.xml";
+		var config = io.read_properties( path: filename);
+		if(config == nil) {
+			gui.popupTip("Error while loading configuration");
+			return;
+		}
+		#props.dump(config)
+		
+		# Set global properties according to saved file
+		#setprop()
+		
+		# Update device parameters
+		var devices = hapticNode.getChildren("device");
+		var old_devices = config.getChildren("device");
+        forindex(var i; old_devices)
+        {
+		  # Find matching device name
+		  var index = nil;
+		  #props.dump(old_devices[i]);
+		  forindex(var j; devices)
+		  {
+		    if(devices[j].getNode("name").getValue() == old_devices[i].getNode("name").getValue()) {
+			  index = j;
+			  break;
+			}
+		  }
+		  if(index ==  nil) continue;
+		  
+		  # TODO: Fill device parameters
+		  #props.dump(old_devices[i]);
+		  
+		  var value = old_devices[i].getValue("autocenter");
+		  if(value != nil) devices[j].setValue("autocenter", value);
+
+		  value = old_devices[i].getValue("gain");
+		  if(value != nil) devices[j].setValue("gain", value);
+
+		  value = old_devices[i].getValue("pilot/gain");
+		  if(value != nil) devices[j].setValue("pilot/gain", value);
+		  value = old_devices[i].getValue("pilot/x");
+		  if(value != nil) devices[j].setValue("pilot/x", value);
+		  value = old_devices[i].getValue("pilot/y");
+		  if(value != nil) devices[j].setValue("pilot/y", value);
+		  value = old_devices[i].getValue("pilot/z");
+		  if(value != nil) devices[j].setValue("pilot/z", value);
+
+ 		  value = old_devices[i].getValue("stick-force/gain");
+		  if(value != nil) devices[j].setValue("stick-force/gain", value);
+ 		  value = old_devices[i].getValue("stick-force/mode");
+		  if(value != nil) devices[j].setValue("stick-force/mode", value);
+ 		  value = old_devices[i].getValue("stick-force/x");
+		  if(value != nil) devices[j].setValue("stick-force/x", value);
+ 		  value = old_devices[i].getValue("stick-force/y");
+		  if(value != nil) devices[j].setValue("stick-force/y", value);
+ 		  value = old_devices[i].getValue("stick-force/z");
+		  if(value != nil) devices[j].setValue("stick-force/z", value);
+
+ 		  value = old_devices[i].getValue("stick-shaker/gain");
+		  if(value != nil) devices[j].setValue("stick-shaker/gain", value);
+ 		  value = old_devices[i].getValue("stick-shaker/direction");
+		  if(value != nil) devices[j].setValue("stick-shaker/direction", value);
+ 		  value = old_devices[i].getValue("stick-shaker/period");
+		  if(value != nil) devices[j].setValue("stick-shaker/period", value);
+
+ 		  value = old_devices[i].getValue("ground-rumble/gain");
+		  if(value != nil) devices[j].setValue("ground-rumble/gain", value);
+ 		  value = old_devices[i].getValue("ground-rumble/mode");
+		  if(value != nil) devices[j].setValue("ground-rumble/mode", value);
+        }
+		
+		# Update dialog
+		changeDevice();
+		gui.popupTip("Configuration loaded");
+	  };
 
 
       # Find the combo box for devices
@@ -900,6 +1035,7 @@
 
       var hapticNode = props.globals.getNode("/haptic", 1);
       if(hapticNode == nil) {
+		gui.popupTip("Haptic node not found");
         die("No haptic devices found, is fg-haptic running?");
       }
 
