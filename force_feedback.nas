@@ -299,7 +299,99 @@ controls.rudderTrim = func(rate) {
 };
 
 
+var save_config = func {
+  # Save configuration of all devices
 
+  # Then save the haptic tree to file
+  var filename = getprop("/sim/fg-home") ~ "/Export/haptic-config.xml";
+  if(io.write_properties( path: filename, prop: "/haptic" ) != nil) {
+    gui.popupTip("Configuration saved succesfully");
+  } else {
+    gui.popupTip("Error while saving configuration");
+  }
+};
+
+var load_config = func {
+  var value = nil;
+
+  # Load configuration from exported XML
+  var hapticNode = props.globals.getNode("/haptic");
+
+  var filename = getprop("/sim/fg-home") ~ "/Export/haptic-config.xml";
+  var config = io.read_properties( path: filename);
+  if(config == nil) {
+    gui.popupTip("Could not load force-feedback configuration");
+    return;
+  }
+
+  # Set global properties according to saved file
+  value = config.getValue("force-trim-aileron");
+  if(value != nil) hapticNode.setValue("force-trim-aileron", value);
+  value = config.getValue("force-trim-elevator");
+  if(value != nil) hapticNode.setValue("force-trim-elevator", value);
+  value = config.getValue("force-trim-rudder");
+  if(value != nil) hapticNode.setValue("force-trim-rudder", value);
+
+  # Update device parameters if matching device is found
+  var devices = hapticNode.getChildren("device");
+  var old_devices = config.getChildren("device");
+  forindex(var i; old_devices)
+  {
+    # Find matching device name
+    var index = nil;
+    #props.dump(old_devices[i]);
+    forindex(var j; devices)
+    {
+      if(devices[j].getNode("name").getValue() == old_devices[i].getNode("name").getValue()) {
+        index = j;
+        break;
+      }
+    }
+    if(index ==  nil) continue;
+  
+    # Fill device parameter properties
+    value = old_devices[i].getValue("autocenter");
+    if(value != nil) devices[j].setValue("autocenter", value);
+
+    value = old_devices[i].getValue("gain");
+    if(value != nil) devices[j].setValue("gain", value);
+
+    value = old_devices[i].getValue("pilot/gain");
+    if(value != nil) devices[j].setValue("pilot/gain", value);
+    value = old_devices[i].getValue("pilot/x");
+    if(value != nil) devices[j].setValue("pilot/x", value);
+    value = old_devices[i].getValue("pilot/y");
+    if(value != nil) devices[j].setValue("pilot/y", value);
+    value = old_devices[i].getValue("pilot/z");
+    if(value != nil) devices[j].setValue("pilot/z", value);
+
+    value = old_devices[i].getValue("stick-force/gain");
+    if(value != nil) devices[j].setValue("stick-force/gain", value);
+    value = old_devices[i].getValue("stick-force/mode");
+    if(value != nil) devices[j].setValue("stick-force/mode", value);
+    value = old_devices[i].getValue("stick-force/x");
+    if(value != nil) devices[j].setValue("stick-force/x", value);
+    value = old_devices[i].getValue("stick-force/y");
+    if(value != nil) devices[j].setValue("stick-force/y", value);
+    value = old_devices[i].getValue("stick-force/z");
+    if(value != nil) devices[j].setValue("stick-force/z", value);
+
+    value = old_devices[i].getValue("stick-shaker/gain");
+    if(value != nil) devices[j].setValue("stick-shaker/gain", value);
+    value = old_devices[i].getValue("stick-shaker/direction");
+    if(value != nil) devices[j].setValue("stick-shaker/direction", value);
+    value = old_devices[i].getValue("stick-shaker/period");
+    if(value != nil) devices[j].setValue("stick-shaker/period", value);
+
+    value = old_devices[i].getValue("ground-rumble/gain");
+    if(value != nil) devices[j].setValue("ground-rumble/gain", value);
+    value = old_devices[i].getValue("ground-rumble/mode");
+    if(value != nil) devices[j].setValue("ground-rumble/mode", value);
+  }
+
+  # Update dialog
+  gui.popupTip("Force-feedback configuration loaded");
+};
 
 ###
 # Read aircraft properties when fdm is ready
@@ -327,8 +419,8 @@ _setlistener("/sim/signals/fdm-initialized", func {
 ###
 # Main initialization
 _setlistener("/sim/signals/nasal-dir-initialized", func {
-
   # Add default parameters to property tree
+  
   # TODO: Update constants from aircraft setup?
   props.globals.initNode("/haptic/aircraft-setup/aileron-max-deflection-deg", aileron_max_deflection/0.01745329, "DOUBLE");
   props.globals.initNode("/haptic/aircraft-setup/elevator-max-deflection-deg", elevator_max_deflection/0.01745329, "DOUBLE");
@@ -362,11 +454,15 @@ _setlistener("/sim/signals/nasal-dir-initialized", func {
   
   props.globals.initNode("/haptic/ground-rumble/gain", 0.0, "DOUBLE");
   props.globals.initNode("/haptic/ground-rumble/mode", 0, "INT");
-  
-  props.globals.initNode("/haptic/devices-reconfigured", 0, "DOUBLE");
 
   props.globals.initNode("/haptic/test-mode", 0, "BOOL");
-
+  
+  var devices_sent = props.globals.getValue("/haptic/devices-reconfigured");
+  if(devices_sent == nil) props.globals.initNode("/haptic/devices-reconfigured", 0, "DOUBLE");
+  else load_config();
+  
+  # When devices are written the first time, load the saved configuration from disk
+  _setlistener("/haptic/devices-reconfigured", load_config);
  
   # Add dialog to menu
   props.globals.getNode("/sim/menubar/default/menu[9]/item[99]/enabled", 1).setBoolValue(1);
