@@ -3,7 +3,7 @@ Fg-Haptic
 
 Force feedback (haptic) support for Flight Gear flight simulator
 
-Version 0.5
+Version 0.6
 
 Copyright (C) Lauri Peltonen, 2011, 2020
 
@@ -16,7 +16,7 @@ Description
 This force feedback support consists of 4 components:
 - fg-haptic or fg-haptic.exe
 - force-feedback.xml
-- force-feedback.nas
+- force_feedback.nas
 - ff-protocol.xml
 
 fg-haptic or fg-haptic.exe is the main program, which
@@ -25,7 +25,7 @@ supports force feedback devices through SDL 2 library.
 force-feedback.xml is a configuration dialog which resides
 inside Flight Gear's data directory.
 
-force-feedback.nas is a wrapper between different flight
+force_feedback.nas is a wrapper between different flight
 dynamics models etc. and the force feedback effects.
 
 ff-protocol.xml is a generic IO protocol which fg-haptic
@@ -78,7 +78,7 @@ fg-haptic(.exe) can reside anywhere on your system.
 force-feedback.xml must be copied into **gui/dialogs/** directory
 inside Flight Gear's data directory.
 
-force-feedback.nas must be copied into **Nasal/** directory
+force_feedback.nas must be copied into **Nasal/** directory
 inside Flight Gear's data directory.
 
 ff-protocol.xml must be copied into **Protocol/** directory
