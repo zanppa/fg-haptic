@@ -792,7 +792,6 @@ int main(int argc, char **argv)
 {
 	int i = 0;
 	char *name = NULL;
-	struct sigaction signal_handler;
 	effectParams *oldParams = NULL;
 	unsigned int runtime = 0;
 	unsigned int dt = 0;
@@ -801,12 +800,21 @@ int main(int argc, char **argv)
 	bool start_effects = true;
 	bool old_reconf = false;
 
+
+#ifdef _WIN32
+    signal(SIGINT, abort_execution);
+    signal(SIGTERM, abort_execution);
+    signal(SIGABRT, abort_execution);
+#else
+	struct sigaction signal_handler;
+
 	// Handlers for ctrl+c etc quitting methods
 	signal_handler.sa_handler = abort_execution;
 	sigemptyset(&signal_handler.sa_mask);
 	signal_handler.sa_flags = 0;
 	sigaction(SIGINT, &signal_handler, NULL);
 	sigaction(SIGQUIT, &signal_handler, NULL);
+#endif
 
 	printf("fg-haptic version 0.6\n");
 	printf("Force feedback support for Flight Gear\n");
