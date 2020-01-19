@@ -139,8 +139,7 @@
     <empty><stretch>1</stretch></empty>
 
   </group>
-
-
+  
   <hrule><stretch>1</stretch></hrule>
 
 
@@ -597,14 +596,67 @@
           <enable><property>/sim/gui/dialogs/force-feedback/ground-rumble-enable</property></enable>
         </text>
       </group>
-	  
-	  <empty><stretch>1</stretch></empty>
-	  
     </group>
+
+	<empty><stretch>1</stretch></empty>
 	
   </group>
 
 
+  <!--<hrule><stretch>1</stretch></hrule>-->
+  
+  <!-- Global options -->
+  <group>
+    <layout>hbox</layout>
+    <!--<empty><stretch>1</stretch></empty>-->
+	<hrule><stretch>1</stretch></hrule>
+
+    <text>
+      <label>Global options</label>
+    </text>
+    <hrule><stretch>1</stretch></hrule>
+    <!--<empty><stretch>1</stretch></empty>-->
+  </group>
+  
+  <!-- Force feedback trim -->
+  <group>
+    <layout>vbox</layout>
+	
+	<group>
+	  <layout>hbox</layout>
+
+      <text><label>Force-feedback trim:</label></text>
+	  
+	  <checkbox>
+	    <label>Aileron</label>
+		<property>/sim/gui/dialogs/force-feedback/force-trim-aileron</property>
+        <binding>
+          <command>dialog-apply</command>
+          <object-name>force-trim-aileron</object-name>
+          </binding>
+      </checkbox>
+
+	  <checkbox>
+	    <label>Elevator</label>
+		<property>/sim/gui/dialogs/force-feedback/force-trim-elevator</property>
+        <binding>
+          <command>dialog-apply</command>
+          <object-name>force-trim-elevator</object-name>
+          </binding>
+      </checkbox>
+	  
+	  <checkbox>
+	    <label>Rudder</label>
+		<property>/sim/gui/dialogs/force-feedback/force-trim-rudder</property>
+        <binding>
+          <command>dialog-apply</command>
+          <object-name>force-trim-rudder</object-name>
+          </binding>
+      </checkbox>
+    </group>
+	
+  </group>
+  
   <hrule><stretch>1</stretch></hrule>
 
 
@@ -616,7 +668,7 @@
       <legend>Save</legend>
       <binding>
         <command>nasal</command>
-        <script>save_config();</script>
+        <script>applyChanges(); force_feedback.save_config();</script>
       </binding>
     </button>
 	<!-- Load button -->
@@ -624,7 +676,7 @@
       <legend>Load</legend>
       <binding>
         <command>nasal</command>
-        <script>load_config();</script>
+        <script>force_feedback.load_config(); changeDevice();</script>
       </binding>
     </button>
 
@@ -699,6 +751,11 @@
       var applyChanges = func {
         var hapticNode = props.globals.getNode("/haptic", 1);
         if(hapticNode == nil) return;
+		
+		# Set global parameters
+		setprop("/haptic/force-trim-aileron", getprop("/sim/gui/dialogs/force-feedback/force-trim-aileron"));
+		setprop("/haptic/force-trim-elevator", getprop("/sim/gui/dialogs/force-feedback/force-trim-elevator"));
+		setprop("/haptic/force-trim-rudder", getprop("/sim/gui/dialogs/force-feedback/force-trim-rudder"));
 
         # Loop through devices, and find one with correct name
         var devices = hapticNode.getChildren("device");
@@ -798,13 +855,14 @@
         if(effect == nil) setprop("/sim/gui/dialogs/force-feedback/pilot-g-x", "-Y");
         else setprop("/sim/gui/dialogs/force-feedback/pilot-g-x", getAxisName(effect, pilot_axis));
 
-        if(getprop("/haptic/device[" ~ dev ~ "]/axes") > 1) {
+		var axes = getprop("/haptic/device[" ~ dev ~ "]/axes");
+        if(axes != nil and axes > 1) {
           effect = getprop("/haptic/device[" ~ dev ~ "]/pilot/y");
           if(effect == nil) setprop("/sim/gui/dialogs/force-feedback/pilot-g-y", "X");
           else setprop("/sim/gui/dialogs/force-feedback/pilot-g-y", getAxisName(effect, pilot_axis));
         } else setprop("/sim/gui/dialogs/force-feedback/pilot-g-y", "None");
 
-        if(getprop("/haptic/device[" ~ dev ~ "]/axes") > 2) {
+        if(axes != nil and axes > 2) {
           effect = getprop("/haptic/device[" ~ dev ~ "]/pilot/z");
           if(effect == nil) setprop("/sim/gui/dialogs/force-feedback/pilot-g-z", "Z");
           else setprop("/sim/gui/dialogs/force-feedback/pilot-g-z", getAxisName(effect, pilot_axis));
@@ -841,13 +899,13 @@
         if(effect == nil) setprop("/sim/gui/dialogs/force-feedback/control-surface-x", "-Aileron");
         else setprop("/sim/gui/dialogs/force-feedback/control-surface-x", getAxisName(effect, stick_axis));
 
-        if(getprop("/haptic/device[" ~ dev ~ "]/axes") > 1) {
+        if(axes != nil and axes > 1) {
           effect = getprop("/haptic/device[" ~ dev ~ "]/stick-force/y");
           if(effect == nil) setprop("/sim/gui/dialogs/force-feedback/control-surface-y", "-Elevator");
           else setprop("/sim/gui/dialogs/force-feedback/control-surface-y", getAxisName(effect, stick_axis));
         } else setprop("/sim/gui/dialogs/force-feedback/control-surface-y", "None");
 
-        if(getprop("/haptic/device[" ~ dev ~ "]/axes") > 2) {
+        if(axes != nil and axes > 2) {
           effect = getprop("/haptic/device[" ~ dev ~ "]/stick-force/z");
           if(effect == nil) setprop("/sim/gui/dialogs/force-feedback/control-surface-z", "Rudder");
           else setprop("/sim/gui/dialogs/force-feedback/control-surface-z", getAxisName(effect, stick_axis));
@@ -936,99 +994,6 @@
         # Not found, some kind of error! Leave the dialog alone.
       };
 	  
-	  var save_config = func {
-        # Save configuration of all devices
-		
-		# First apply everything
-		applyChanges();
-		
-		# Then save the haptic tree to file
-		var filename = getprop("/sim/fg-home") ~ "/Export/haptic-config.xml";
-		if(io.write_properties( path: filename, prop: "/haptic" ) != nil) {
-			gui.popupTip("Configuration saved succesfully");
-		} else {
-			gui.popupTip("Error while saving configuration");
-		}
-	  };
-	  
-	  var load_config = func {
-	    # Load configuration from exported XML
-		
-		var filename = getprop("/sim/fg-home") ~ "/Export/haptic-config.xml";
-		var config = io.read_properties( path: filename);
-		if(config == nil) {
-			gui.popupTip("Error while loading configuration");
-			return;
-		}
-		#props.dump(config)
-		
-		# Set global properties according to saved file
-		#setprop()
-		
-		# Update device parameters
-		var devices = hapticNode.getChildren("device");
-		var old_devices = config.getChildren("device");
-        forindex(var i; old_devices)
-        {
-		  # Find matching device name
-		  var index = nil;
-		  #props.dump(old_devices[i]);
-		  forindex(var j; devices)
-		  {
-		    if(devices[j].getNode("name").getValue() == old_devices[i].getNode("name").getValue()) {
-			  index = j;
-			  break;
-			}
-		  }
-		  if(index ==  nil) continue;
-		  
-		  # TODO: Fill device parameters
-		  #props.dump(old_devices[i]);
-		  
-		  var value = old_devices[i].getValue("autocenter");
-		  if(value != nil) devices[j].setValue("autocenter", value);
-
-		  value = old_devices[i].getValue("gain");
-		  if(value != nil) devices[j].setValue("gain", value);
-
-		  value = old_devices[i].getValue("pilot/gain");
-		  if(value != nil) devices[j].setValue("pilot/gain", value);
-		  value = old_devices[i].getValue("pilot/x");
-		  if(value != nil) devices[j].setValue("pilot/x", value);
-		  value = old_devices[i].getValue("pilot/y");
-		  if(value != nil) devices[j].setValue("pilot/y", value);
-		  value = old_devices[i].getValue("pilot/z");
-		  if(value != nil) devices[j].setValue("pilot/z", value);
-
- 		  value = old_devices[i].getValue("stick-force/gain");
-		  if(value != nil) devices[j].setValue("stick-force/gain", value);
- 		  value = old_devices[i].getValue("stick-force/mode");
-		  if(value != nil) devices[j].setValue("stick-force/mode", value);
- 		  value = old_devices[i].getValue("stick-force/x");
-		  if(value != nil) devices[j].setValue("stick-force/x", value);
- 		  value = old_devices[i].getValue("stick-force/y");
-		  if(value != nil) devices[j].setValue("stick-force/y", value);
- 		  value = old_devices[i].getValue("stick-force/z");
-		  if(value != nil) devices[j].setValue("stick-force/z", value);
-
- 		  value = old_devices[i].getValue("stick-shaker/gain");
-		  if(value != nil) devices[j].setValue("stick-shaker/gain", value);
- 		  value = old_devices[i].getValue("stick-shaker/direction");
-		  if(value != nil) devices[j].setValue("stick-shaker/direction", value);
- 		  value = old_devices[i].getValue("stick-shaker/period");
-		  if(value != nil) devices[j].setValue("stick-shaker/period", value);
-
- 		  value = old_devices[i].getValue("ground-rumble/gain");
-		  if(value != nil) devices[j].setValue("ground-rumble/gain", value);
- 		  value = old_devices[i].getValue("ground-rumble/mode");
-		  if(value != nil) devices[j].setValue("ground-rumble/mode", value);
-        }
-		
-		# Update dialog
-		changeDevice();
-		gui.popupTip("Configuration loaded");
-	  };
-
 
       # Find the combo box for devices
       var devicesCombo = cmdarg().getNode("group[1]/combo");
