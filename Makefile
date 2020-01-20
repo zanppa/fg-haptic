@@ -15,7 +15,8 @@ LIBS	= -L/usr/local/lib -Wl,-rpath,/usr/local/lib -lm $(foreach pkg,$(PKGS),$(sh
 
 TARGETS = \
 	fg-haptic$(EXE) \
-	test-haptic$(EXE)
+	test-haptic$(EXE) \
+	js-send$(EXE)
 
 all: $(TARGETS)
 
@@ -23,6 +24,9 @@ fg-haptic$(EXE): $(srcdir)/fg-haptic.c
 	$(CC) -o $@ $? $(DEFS) $(CFLAGS) $(LIBS)
 
 test-haptic$(EXE): $(srcdir)/test-haptic.c
+	$(CC) -o $@ $? $(DEFS) $(CFLAGS) $(LIBS)
+
+js-send$(EXE): $(srcdir)/js-send.c
 	$(CC) -o $@ $? $(DEFS) $(CFLAGS) $(LIBS)
 
 clean:
