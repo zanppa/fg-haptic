@@ -23,10 +23,10 @@ all: $(TARGETS)
 fg-haptic$(EXE): $(srcdir)/fg-haptic.c
 	$(CC) -o $@ $? $(DEFS) $(CFLAGS) $(LIBS)
 
-test-haptic$(EXE): $(srcdir)/test-haptic.c
+test-haptic$(EXE): $(srcdir)/tools/test-haptic.c
 	$(CC) -o $@ $? $(DEFS) $(CFLAGS) $(LIBS)
 
-js-send$(EXE): $(srcdir)/js-send.c
+js-send$(EXE): $(srcdir)/tools/js-send.c
 	$(CC) -o $@ $? $(DEFS) $(CFLAGS) $(LIBS)
 
 clean:
