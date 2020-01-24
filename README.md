@@ -78,6 +78,10 @@ Installation
 
 fg-haptic(.exe) can reside anywhere on your system.
 
+Linux: Install `libsdl2` and `libsdl2-net`.
+
+Windows: Install [SDL2 runtime](https://www.libsdl.org/download-2.0.php) and [SDL2_net runtime](https://www.libsdl.org/projects/SDL_net/) dlls to the same directory as fg-haptic.exe.
+
 force-feedback.xml must be copied into **gui/dialogs/** directory
 inside Flight Gear's data directory.
 
