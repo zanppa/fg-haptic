@@ -71,8 +71,14 @@ int main(int argc, char **argv)
 	float jval[MAX_AXIS] = {0.0};	// Joystick axis values
 	int channel;
 
+	char address[129] = {0};
+
 	SDL_Joystick *joystick;
 	SDL_Event event;
+
+	bool swap_elevator = true;
+	bool swap_throttle = true;
+	bool scale_throttle = true;
 
 #ifdef _WIN32
     signal(SIGINT, abort_execution);
@@ -93,14 +99,28 @@ int main(int argc, char **argv)
 	printf("Sned joystick inputs to Flight Gear\n");
 	printf("Copyright 2020 Lauri Peltonen, released under GPLv2 or later\n\n");
 
-	if (argc > 1) {
+	strncpy(address, DFLTHOST, 128);
+
+	// Go through parameters
+	for(int i=1;i<argc;i++) {
 		name = argv[1];
 		if ((strcmp(name, "--help") == 0) || (strcmp(name, "-h") == 0)) {
-			printf("USAGE: %s [optional parameters]\n"
+			printf("USAGE: %s [address] [optional parameters]\n"
+				   "	address : Network address to connect to\n"
 			       "    -h or --help : Show this help\n"
-			       "    -t or --test : Test force feedback effects\n\n"
+			       "    --swap_throttle : Swap throttle axis\n"
+			       "    --no_scale_throttle : Do not re-scale throttle axis\n"
+			       "    --swap_elevator : Swap elevator axis\n\n"
 			       "UDP port for FlightGear is %d and generic\n", argv[0], DFLTPORT);
 			return 0;
+		} else if(strcmp(name, "--swap_throttle") == 0) {
+			swap_throttle = false;
+		} else if(strcmp(name, "--swap_elevator") == 0) {
+			swap_elevator = false;
+		} else if(strcmp(name, "--no_scale_throttle") == 0) {
+			scale_throttle = false;
+		} else if(strlen(name) > 0) {	// Assume any non-known parameter is address
+			strncpy(address, name, 128);
 		}
 	}
 
@@ -124,8 +144,8 @@ int main(int argc, char **argv)
 	}
 
 	IPaddress addr;
-	if(SDLNet_ResolveHost(&addr, DFLTHOST, DFLTPORT) < 0) {
-		printf("Could not resolve host: %s\n", SDLNet_GetError());
+	if(SDLNet_ResolveHost(&addr, address, DFLTPORT) < 0) {
+		printf("Could not resolve host \"%s\": %s\n", address, SDLNet_GetError());
 		abort_execution(-1);
 	}
 	channel = SDLNet_UDP_Bind(server_sock, -1, &addr);
@@ -186,7 +206,15 @@ int main(int argc, char **argv)
 		}
 
 		// Send data
-		fg_packet->len = snprintf(fg_packet->data, MAX_MSG-1, "%.3f|%.3f|%.3f|%.3f\r\n", jval[0], jval[1], jval[2], jval[3]);
+		float throttle = swap_throttle ? -jval[2] : jval[2];
+		if(scale_throttle)	// Scale from -1 ... 1 to 0...1
+			throttle = (throttle + 1.0) * 0.5;
+
+		fg_packet->len = snprintf(fg_packet->data, MAX_MSG-1, "%.3f|%.3f|%.3f|%.3f\r\n",
+			jval[0],								// Aileron
+			swap_elevator ? -jval[1] : jval[1],		// Elevator
+			throttle,		// Throttle
+			jval[3]);		// Rudder
 		fg_packet->channel = channel;
 		SDLNet_UDP_Send(server_sock, channel, fg_packet);
 
