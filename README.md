@@ -35,7 +35,10 @@ This program has been tested with following devices:
 
 - Saitek Cyborg Evo Force (Linux)
   * All effects supported
-  * Needs special kernel patch
+  * Needs special [kernel patch](https://github.com/zanppa/hid-pidff/)
+
+- Saitek Cyborg Evo Force (Windows 10, 64 bit)
+  * Joystick driver does not work properly. Even Saitek's own force tester in configuration crashes.
 
 - Gametech "Twin USB Joystick" gamepad with rumble effect (Linux)
   * Supports only stick shaker, if gain & strength are around 1.0
@@ -43,7 +46,7 @@ This program has been tested with following devices:
 
 - Logitech Driving Force GT wheel (Linux)
   * Supports only constant forces
-  * Really has 1 axis only, but calims to have 2
+  * Really has 1 axis only, but claims to have 2
 
 - Logitech Wingman Force 3D (Linux)
   * Supports only constant forces
