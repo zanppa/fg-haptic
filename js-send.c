@@ -42,7 +42,6 @@ float clamp(float x, float l, float h)
 static UDPpacket *fg_packet = NULL;
 void write_fg_generic(void)
 {
-	int reconf, read;
 	const char *p;
 
 	if(!fg_packet)
@@ -168,12 +167,13 @@ int main(int argc, char **argv)
 	    printf("The names of the joysticks are:\n");
     	for( i=0; i < SDL_NumJoysticks(); i++ )
 	    {
-    	    printf("    %s\n", SDL_JoystickName(i));
+    	    printf("    %s\n", SDL_JoystickNameForIndex(i));
 	    }
 	}
 
     SDL_JoystickEventState(SDL_ENABLE);
     joystick = SDL_JoystickOpen(0);
+	printf("Using joystick %s\n", SDL_JoystickName(joystick));
 
 	// Main loop
 	while(!quit)
@@ -210,7 +210,7 @@ int main(int argc, char **argv)
 		if(scale_throttle)	// Scale from -1 ... 1 to 0...1
 			throttle = (throttle + 1.0) * 0.5;
 
-		fg_packet->len = snprintf(fg_packet->data, MAX_MSG-1, "%.3f|%.3f|%.3f|%.3f\r\n",
+		fg_packet->len = snprintf((char *)fg_packet->data, MAX_MSG-1, "%.3f|%.3f|%.3f|%.3f\r\n",
 			jval[0],								// Aileron
 			swap_elevator ? -jval[1] : jval[1],		// Elevator
 			throttle,		// Throttle
