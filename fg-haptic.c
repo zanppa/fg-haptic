@@ -65,6 +65,7 @@ TCPsocket telnet_sock;
 UDPsocket server_sock;
 IPaddress *client_addr;
 SDLNet_SocketSet socketset;
+static UDPpacket *fg_packet = NULL;
 
 // Effect struct definitions, used to store parameters
 typedef struct __effectParams {
@@ -125,7 +126,7 @@ typedef struct __hapticdevice {
 } hapticDevice;
 
 static hapticDevice *devices = NULL;
-bool reconf_request = false;
+int reconf_request = false;
 bool quit = false;
 
 effectParams new_params;
@@ -440,16 +441,21 @@ void read_devices(void)
 	fgfswrite(telnet_sock, "set /haptic/reconfigure 0");
 	printf("Waiting for the command to go through...\n");
 	do {
+		idata = 1;
 		fgfswrite(telnet_sock, "get /haptic/reconfigure");
 		p = fgfsread(telnet_sock, READ_TIMEOUT);
 		if (p)
 			read = sscanf(p, "%d", &idata);
 		else
 			read = 0;
-	} while (read == 1 && idata == 1);
+	} while(idata);
 	printf("Done\n");
 
 	//fgfsflush(client_sock);	// Get rid of FF data that was received during reinitialization
+
+	// Flush UDP
+	if(fg_packet)
+		while(SDLNet_UDP_Recv(server_sock, fg_packet) > 0);
 
 	return;
 }
@@ -622,16 +628,15 @@ void reload_effect(hapticDevice * device, SDL_HapticEffect * effect, int *effect
 	}
 }
 
-static UDPpacket *fg_packet = NULL;
 
 void read_fg_generic(void)
 {
 	int reconf, read;
-	const char *p;
+	char *p;
 	effectParams params;
 
 	if(!fg_packet)
-		fg_packet = SDLNet_AllocPacket(512);
+		fg_packet = SDLNet_AllocPacket(1024);
 	if(!fg_packet)
 		return;
 
@@ -656,13 +661,13 @@ void read_fg_generic(void)
 		printf("Error reading generic I/O!\n");
 		return;
 	}
-	printf("%s", p);
-	//printf("%d\n", reconf);
+	// printf("%s\n", p);
+	// printf("%d\n", reconf);
 
 	memcpy(&new_params, &params, sizeof(effectParams));
 
-	if (reconf & 1)
-		reconf_request = true;
+	if (reconf)
+		reconf_request = reconf;
 }
 
 void test_effects(void)
@@ -1048,8 +1053,9 @@ int main(int argc, char **argv)
 			start_effects = false;
 		}
 
+		//printf("%d %d\n", reconf_request, old_reconf);
 		if (reconf_request && !old_reconf) {
-			//reconf_request = false;
+			reconf_request = false;
 			read_devices();
 			create_effects();
 			start_effects = true;
