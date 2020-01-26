@@ -31,6 +31,28 @@
        <node>/controls/engines/engine[0]/throttle</node>
      </chunk>
 
+ 	 <chunk>
+       <name>Throttle</name>
+       <format>%f</format>
+       <type>float</type>
+       <node>/controls/engines/engine[1]/throttle</node>
+     </chunk>
+
+	 <chunk>
+       <name>Throttle</name>
+       <format>%f</format>
+       <type>float</type>
+       <node>/controls/engines/engine[2]/throttle</node>
+     </chunk>
+
+	 <chunk>
+       <name>Throttle</name>
+       <format>%f</format>
+       <type>float</type>
+       <node>/controls/engines/engine[3]/throttle</node>
+     </chunk>
+
+	 
      <chunk>
        <name>Rudder</name>
        <format>%f</format>
