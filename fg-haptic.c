@@ -1241,6 +1241,7 @@ const char *fgfsread(TCPsocket sock, int timeout)
 	do {
 		if (SDLNet_TCP_Recv(sock, p, 1) <= 0) {
 			// printf("Error in fgfsread: Recv returned zero!\n");
+			printf("Telnet connection closed. Quit!\n");
 			quit = true;
 			return NULL;
 		}
