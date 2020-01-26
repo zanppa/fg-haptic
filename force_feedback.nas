@@ -456,14 +456,17 @@ _setlistener("/sim/signals/nasal-dir-initialized", func {
   props.globals.initNode("/haptic/ground-rumble/mode", 0, "INT");
 
   props.globals.initNode("/haptic/test-mode", 0, "BOOL");
-  
+    
   var devices_sent = props.globals.getValue("/haptic/devices-reconfigured");
   if(devices_sent == nil) props.globals.initNode("/haptic/devices-reconfigured", 0, "DOUBLE");
   else load_config();
   
   # When devices are written the first time, load the saved configuration from disk
   _setlistener("/haptic/devices-reconfigured", load_config);
- 
+
+  # Request fg-haptic to send device data
+  props.globals.initNode("/haptic/reconfigure", 2, "INT");
+  
   # Add dialog to menu
   props.globals.getNode("/sim/menubar/default/menu[9]/item[99]/enabled", 1).setBoolValue(1);
   props.globals.getNode("/sim/menubar/default/menu[9]/item[99]/name", 1).setValue("force-feedback");
