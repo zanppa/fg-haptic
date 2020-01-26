@@ -954,7 +954,7 @@ int main(int argc, char **argv)
 
 			// Ground rumble in normal mode
 			devices[i].params.rumble_period = new_params.rumble_period;
-			if(devices[i].rumble_mode == MODE_NORMAL) {
+			if(devices[i].effectId[GROUND_NOTCH] != -1 && devices[i].rumble_mode == MODE_NORMAL) {
 				if (new_params.rumble_period > 0.00001) {
 					devices[i].effect[GROUND_NOTCH].periodic.period = new_params.rumble_period;
 					if(oldParams[i].rumble_period < 0.00001) {
