@@ -76,9 +76,11 @@ typedef struct __effectParams {
 
 	float rumble_period;	// Ground rumble period, 0=disable
 
-	float x;		// Forces
+	float x;		// Forces (pilot)
 	float y;
 	float z;
+
+	float coeff[AXES];	// Spring effect coefficients
 } effectParams;
 
 int num_devices;
@@ -823,7 +825,6 @@ void test_effects(void)
  */
 int main(int argc, char **argv)
 {
-	int i = 0;
 	char *name = NULL;
 	effectParams *oldParams = NULL;
 	unsigned int runtime = 0;
@@ -931,6 +932,9 @@ int main(int argc, char **argv)
 		abort_execution(-1);
 	}
 
+	for (int i = 0; i < num_devices; i++)
+		memset((void *)&devices[i].params, 0, sizeof(effectParams));
+
 	printf("Running...\n");
 
 	// Main loop
@@ -942,10 +946,10 @@ int main(int argc, char **argv)
 		dt = runtime - dt;
 
 		// Back up old parameters
-		for (int i = 0; i < num_devices; i++)
+		for (int i = 0; i < num_devices; i++) {
 			memcpy((void *)&oldParams[i], (void *)&devices[i].params, sizeof(effectParams));
-
-		memset((void *)&devices[i].params, 0, sizeof(effectParams));
+			memset((void *)&devices[i].params, 0, sizeof(effectParams));
+		}
 
 		// Read new parameters
 		old_reconf = reconf_request;
@@ -1036,15 +1040,25 @@ int main(int argc, char **argv)
 
 			// Spring effect if stick forces in normal mode
 			if (devices[i].effectId[SPRING] != -1 && devices[i].stick_mode == MODE_NORMAL) {
+				// Low pass filter coefficients
+				float g1 = ((float)dt / (devices[i].lowpass + dt));
+				float g2 = (devices[i].lowpass / (devices[i].lowpass + dt));
+
 				// Set center point according to trim
 				for(int j=0; j<AXES; j++) {
 					devices[i].effect[SPRING].condition.center[j] = (signed short)clamp(new_params.trim[devices[i].stick_axes[j]]*32767, -32760, 32760);
 
+					// Calculate the new coefficient
+					devices[i].params.coeff[j] = -new_params.stick[devices[i].stick_axes[j]] * devices[i].stick_gain * devices[i].stick_invert[j];
+
+					// Apply low pass filter
+					devices[i].params.coeff[j] = devices[i].params.coeff[j] * g1 + oldParams[i].coeff[j] * g2;
+
 					// Note! the axis are inverted when they come from flightgear, so invert here again
 					devices[i].effect[SPRING].condition.left_coeff[j] =
-						-(signed short)clamp(new_params.stick[devices[i].stick_axes[j]] * devices[i].stick_gain * devices[i].stick_invert[j] * 32767, -32760, 32760);
+						(signed short)clamp(devices[i].params.coeff[j] * 32767, -32760, 32760);
 					devices[i].effect[SPRING].condition.right_coeff[j] =
-						-(signed short)clamp(new_params.stick[devices[i].stick_axes[j]] * devices[i].stick_gain * devices[i].stick_invert[j] * 32767, -32760, 32760);
+						(signed short)clamp(devices[i].params.coeff[j] * 32767, -32760, 32760);
 				}
 
 				reload_effect(&devices[i], &devices[i].effect[SPRING], &devices[i].effectId[SPRING], start_effects);
