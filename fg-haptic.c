@@ -115,6 +115,9 @@ typedef struct __hapticdevice {
 	signed char pilot_axes[AXES];	// Axes mapping, -1 = not used
 	signed char stick_axes[AXES];
 
+	signed char pilot_invert[AXES];
+	signed char stick_invert[AXES];
+
 	unsigned int last_rumble;
 
 	float lowpass;		// Low pass filter tau, in ms
@@ -195,6 +198,8 @@ void init_haptic(void)
 			for (int a = 0; a < devices[i].axes && a < AXES; a++) {
 				devices[i].pilot_axes[a] = a;
 				devices[i].stick_axes[a] = a;
+				devices[i].pilot_invert[a] = 1;
+				devices[i].stick_invert[a] = 1;
 			}
 
 			devices[i].autocenter = 0.0;
@@ -338,25 +343,6 @@ void read_devices(void)
 		// Constant force -> pilot G forces and aileron loading
 		// Currently support 3 axis only
 		if (devices[i].supported & SDL_HAPTIC_CONSTANT) {
-			for (int x = 0; x < devices[i].axes && x < AXES; x++) {
-				fgfswrite(telnet_sock, "get /haptic/device[%d]/pilot/%c", i, axes[x]);
-				p = fgfsread(telnet_sock, READ_TIMEOUT);
-				if (p) {
-					read = sscanf(p, "%d", &idata);
-					if (read == 1)
-						devices[i].pilot_axes[x] = idata;
-					printf("Pilot force axis %c: %c\n", axes[x], axes[devices[i].pilot_axes[x]]);
-				}
-
-				fgfswrite(telnet_sock, "get /haptic/device[%d]/stick-force/%c", i, axes[x]);
-				p = fgfsread(telnet_sock, READ_TIMEOUT);
-				if (p) {
-					read = sscanf(p, "%d", &idata);
-					if (read == 1)
-						devices[i].stick_axes[x] = idata;
-					printf("Stick force axis %c: %c\n", axes[x], axes[devices[i].stick_axes[x]]);
-				}
-			}
 			fgfswrite(telnet_sock, "get /haptic/device[%d]/pilot/gain", i);
 			p = fgfsread(telnet_sock, READ_TIMEOUT);
 			if (p) {
@@ -392,6 +378,37 @@ void read_devices(void)
 				read = sscanf(p, "%d", &idata);
 				if (read == 1)
 					devices[i].rumble_mode = idata;
+			}
+
+			for (int x = 0; x < devices[i].axes && x < AXES; x++) {
+				fgfswrite(telnet_sock, "get /haptic/device[%d]/pilot/%c", i, axes[x]);
+				p = fgfsread(telnet_sock, READ_TIMEOUT);
+				if (p) {
+					read = sscanf(p, "%d", &idata);
+					if (read == 1) {
+						if(idata > AXES) {
+							devices[i].pilot_invert[x] = -1;
+							idata = idata % AXES;
+						} else devices[i].pilot_invert[x] = 1;
+						devices[i].pilot_axes[x] = idata;
+
+					}
+					printf("Pilot force axis %c: %c\n", axes[x], axes[devices[i].pilot_axes[x]]);
+				}
+
+				fgfswrite(telnet_sock, "get /haptic/device[%d]/stick-force/%c", i, axes[x]);
+				p = fgfsread(telnet_sock, READ_TIMEOUT);
+				if (p) {
+					read = sscanf(p, "%d", &idata);
+					if (read == 1) {
+						if(idata > AXES) {
+							devices[i].stick_invert[x] = -1;
+							idata = idata % AXES;
+						} else devices[i].stick_invert[x] = 1;
+						devices[i].stick_axes[x] = idata;
+					}
+					printf("Stick force axis %c: %c\n", axes[x], axes[devices[i].stick_axes[x]]);
+				}
 			}
 		}
 
@@ -639,7 +656,7 @@ void read_fg_generic(void)
 		printf("Error reading generic I/O!\n");
 		return;
 	}
-	//printf("%s", p);
+	printf("%s", p);
 	//printf("%d\n", reconf);
 
 	memcpy(&new_params, &params, sizeof(effectParams));
@@ -872,7 +889,7 @@ int main(int argc, char **argv)
 		abort_execution(-1);
 	}
 	printf("Got connection, sending haptic details through telnet\n");
-	printf("Host: %d.%d.%d.%d Port: %d\n", fgfs_address & 0xFF, (fgfs_address >> 8) & 0xFF, 
+	printf("Host: %d.%d.%d.%d Port: %d\n", fgfs_address & 0xFF, (fgfs_address >> 8) & 0xFF,
 		(fgfs_address >> 16) & 0xFF, (fgfs_address >> 24) & 0xFF, DFLTPORT);
 
 	// Connect to flightgear using telnet
@@ -945,20 +962,20 @@ int main(int argc, char **argv)
 			if ((devices[i].supported & SDL_HAPTIC_CONSTANT)) {
 				// Pilot forces
 				if (devices[i].pilot_axes[0] >= 0)
-					devices[i].params.x = new_params.pilot[devices[i].pilot_axes[0]] * devices[i].pilot_gain;
+					devices[i].params.x = new_params.pilot[devices[i].pilot_axes[0]] * devices[i].pilot_gain * devices[i].pilot_invert[0];
 				if (devices[i].pilot_axes[1] >= 0)
-					devices[i].params.y = new_params.pilot[devices[i].pilot_axes[1]] * devices[i].pilot_gain;
+					devices[i].params.y = new_params.pilot[devices[i].pilot_axes[1]] * devices[i].pilot_gain * devices[i].pilot_invert[1];
 				if (devices[i].pilot_axes[2] >= 0)
-					devices[i].params.z = new_params.pilot[devices[i].pilot_axes[2]] * devices[i].pilot_gain;
+					devices[i].params.z = new_params.pilot[devices[i].pilot_axes[2]] * devices[i].pilot_gain * devices[i].pilot_invert[2];
 
 				if (devices[i].stick_mode == MODE_ALTERNATE) {
 					// Stick forces with axis mapping
 					if (devices[i].stick_axes[0] >= 0)
-						devices[i].params.x += new_params.stick[devices[i].stick_axes[0]] * devices[i].stick_gain;
+						devices[i].params.x += new_params.stick[devices[i].stick_axes[0]] * devices[i].stick_gain * devices[i].stick_invert[0];
 					if (devices[i].stick_axes[1] >= 0)
-						devices[i].params.y += new_params.stick[devices[i].stick_axes[1]] * devices[i].stick_gain;
+						devices[i].params.y += new_params.stick[devices[i].stick_axes[1]] * devices[i].stick_gain * devices[i].stick_invert[1];
 					if (devices[i].stick_axes[2] >= 0)
-						devices[i].params.z += new_params.stick[devices[i].stick_axes[2]] * devices[i].stick_gain;
+						devices[i].params.z += new_params.stick[devices[i].stick_axes[2]] * devices[i].stick_gain * devices[i].stick_invert[2];
 				}
 
 				devices[i].params.x *= 32760.0;
@@ -1009,9 +1026,9 @@ int main(int argc, char **argv)
 
 					// Note! the axis are inverted when they come from flightgear, so invert here again
 					devices[i].effect[SPRING].condition.left_coeff[j] =
-						-(signed short)clamp(new_params.stick[devices[i].stick_axes[j]] * devices[i].stick_gain*32767, -32760, 32760);
+						-(signed short)clamp(new_params.stick[devices[i].stick_axes[j]] * devices[i].stick_gain * devices[i].stick_invert[j] * 32767, -32760, 32760);
 					devices[i].effect[SPRING].condition.right_coeff[j] =
-						-(signed short)clamp(new_params.stick[devices[i].stick_axes[j]] * devices[i].stick_gain*32767, -32760, 32760);
+						-(signed short)clamp(new_params.stick[devices[i].stick_axes[j]] * devices[i].stick_gain * devices[i].stick_invert[j] * 32767, -32760, 32760);
 				}
 
 				reload_effect(&devices[i], &devices[i].effect[SPRING], &devices[i].effectId[SPRING], start_effects);
