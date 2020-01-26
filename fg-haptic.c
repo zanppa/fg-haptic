@@ -246,8 +246,8 @@ void send_devices(void)
 			// Constant force -> pilot G forces and aileron loading
 			// Currently support 3 axis only
 			for (int x = 0; x < devices[i].axes && x < AXES; x++) {
-				fgfswrite(telnet_sock, "set /haptic/device[%d]/pilot/%c %d", i, axes[x], devices[i].pilot_axes[x]);
-				fgfswrite(telnet_sock, "set /haptic/device[%d]/stick-force/%c %d", i, axes[x], devices[i].stick_axes[x]);
+				fgfswrite(telnet_sock, "set /haptic/device[%d]/pilot/%c %d", i, axes[x], devices[i].pilot_axes[x] + (devices[i].pilot_invert[x] < 0 ? AXES : 0));
+				fgfswrite(telnet_sock, "set /haptic/device[%d]/stick-force/%c %d", i, axes[x], devices[i].stick_axes[x] + (devices[i].stick_invert[x] < 0 ? AXES : 0));
 			}
 			fgfswrite(telnet_sock, "set /haptic/device[%d]/pilot/gain %f", i, devices[i].pilot_gain);
 			fgfswrite(telnet_sock, "set /haptic/device[%d]/pilot/supported 1", i);
