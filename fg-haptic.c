@@ -197,22 +197,26 @@ void init_haptic(void)
 
 			// Default effect parameters
 			for (int a = 0; a < devices[i].axes && a < AXES; a++) {
-				devices[i].pilot_axes[a] = a;
 				devices[i].stick_axes[a] = a;
-				devices[i].pilot_invert[a] = 1;
 				devices[i].stick_invert[a] = 1;
+				devices[i].pilot_invert[a] = 1;
 			}
+
+			// By default only Z axis is mapped to joystick Y in pilot forces
+			devices[i].pilot_axes[0] = -1;
+			devices[i].pilot_axes[1] = 3;
+			devices[i].pilot_axes[2] = -1;
 
 			devices[i].autocenter = 0.0;
 			devices[i].gain = 1.0;
-			devices[i].pilot_gain = 0.1;
+			devices[i].pilot_gain = 0.3;
 			devices[i].stick_gain = 1.0;
 			devices[i].stick_mode = MODE_NORMAL;
 			devices[i].shaker_gain = 0.4;
 			devices[i].shaker_period = 100.0;
 			devices[i].rumble_gain = 0.25;
 			devices[i].rumble_mode = MODE_NORMAL;
-			devices[i].lowpass = 300.0;
+			devices[i].lowpass = 50.0;
 
 		} else {
 			printf("Unable to open haptic devices %d: %s\n", i, SDL_GetError());
