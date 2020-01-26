@@ -438,17 +438,24 @@ void read_devices(void)
 		}
 	}
 
-	fgfswrite(telnet_sock, "set /haptic/reconfigure 0");
-	printf("Waiting for the command to go through...\n");
-	do {
-		idata = 1;
-		fgfswrite(telnet_sock, "get /haptic/reconfigure");
-		p = fgfsread(telnet_sock, READ_TIMEOUT);
-		if (p)
-			read = sscanf(p, "%d", &idata);
-		else
-			read = 0;
-	} while(idata);
+	int retries = 0;
+	idata = 1;
+	while(idata && retries < 20) {
+		fgfswrite(telnet_sock, "set /haptic/reconfigure 0");
+		printf("Waiting for the command to go through...\n");
+		int reads = 0;
+		do {
+			reads++;
+			idata = 1;
+			fgfswrite(telnet_sock, "get /haptic/reconfigure");
+			p = fgfsread(telnet_sock, READ_TIMEOUT);
+			if (p)
+				read = sscanf(p, "%d", &idata);
+			else
+				read = 0;
+		} while(idata && reads < 30);
+		retries++;
+	}
 	printf("Done\n");
 
 	//fgfsflush(client_sock);	// Get rid of FF data that was received during reinitialization
@@ -1055,7 +1062,10 @@ int main(int argc, char **argv)
 
 		//printf("%d %d\n", reconf_request, old_reconf);
 		if (reconf_request && !old_reconf) {
-			reconf_request = false;
+			if(reconf_request > 1)
+				send_devices();
+
+			reconf_request = 0;
 			read_devices();
 			create_effects();
 			start_effects = true;
