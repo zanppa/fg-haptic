@@ -210,10 +210,13 @@ int main(int argc, char **argv)
 		if(scale_throttle)	// Scale from -1 ... 1 to 0...1
 			throttle = (throttle + 1.0) * 0.5;
 
-		fg_packet->len = snprintf((char *)fg_packet->data, MAX_MSG-1, "%.3f|%.3f|%.3f|%.3f\r\n",
+		fg_packet->len = snprintf((char *)fg_packet->data, MAX_MSG-1, "%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f\r\n",
 			jval[0],								// Aileron
 			swap_elevator ? -jval[1] : jval[1],		// Elevator
-			throttle,		// Throttle
+			throttle,		// Throttle, engine 1
+			throttle,		// Throttle, engine 2
+			throttle,		// Throttle, engine 3
+			throttle,		// Throttle, engine 4
 			jval[3]);		// Rudder
 		fg_packet->channel = channel;
 		SDLNet_UDP_Send(server_sock, channel, fg_packet);
