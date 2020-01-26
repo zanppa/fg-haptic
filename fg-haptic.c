@@ -387,7 +387,7 @@ void read_devices(void)
 				if (p) {
 					read = sscanf(p, "%d", &idata);
 					if (read == 1) {
-						if(idata > AXES) {
+						if(idata >= AXES) {
 							devices[i].pilot_invert[x] = -1;
 							idata = idata % AXES;
 						} else devices[i].pilot_invert[x] = 1;
@@ -402,7 +402,7 @@ void read_devices(void)
 				if (p) {
 					read = sscanf(p, "%d", &idata);
 					if (read == 1) {
-						if(idata > AXES) {
+						if(idata >= AXES) {
 							devices[i].stick_invert[x] = -1;
 							idata = idata % AXES;
 						} else devices[i].stick_invert[x] = 1;
