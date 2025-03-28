@@ -9,8 +9,8 @@ var update_interval = 0.05;
 var aileron_max_deflection = 20.0*0.01745329;
 var elevator_max_deflection = 20.0*0.01745329;
 var rudder_max_deflection = 20.0*0.01745329;
-var aileron_gain = 3.0;
-var elevator_gain = 3.0;
+var aileron_gain = 0.05;
+var elevator_gain = 0.05;
 var g_force_gain = 0.003;
 var rudder_gain = 3.0;
 var slip_gain = 1.0;
@@ -118,17 +118,19 @@ var update_stick_forces = func(path) {
 
     slip_gain = 1.0 - slip_gain * math.sin(slip_angle);
 
-    aileron_force = aileron_force * math.sin(aileron_angle) * slip_gain;
+    # Invert all forces here by default, so selecting "X" or "Y" should give correct result
+
+    aileron_force = -aileron_force * math.sin(aileron_angle) * slip_gain;
   
     elevator_force = elevator_force * math.sin(elevator_angle) * slip_gain;
-    elevator_force = elevator_force + g_force_gain * g_force;
+    elevator_force = -elevator_force + g_force_gain * g_force;
 
-    rudder_force = rudder_force * math.sin(rudder_angle);
+    rudder_force = -rudder_force * math.sin(rudder_angle);
   } else {
     # In normal mode scale according to max deflection to have approximately same scaling as alternate mode
     aileron_force = aileron_force * math.sin(aileron_max_deflection);
-	elevator_force = elevator_force * math.sin(elevator_max_deflection);
-	rudder_force = rudder_force * math.sin(rudder_max_deflection);
+    elevator_force = elevator_force * math.sin(elevator_max_deflection);
+    rudder_force = rudder_force * math.sin(rudder_max_deflection);
   }
 
 
@@ -173,7 +175,7 @@ var update_stick_forces = func(path) {
       elevator_force = elevator_force - ((AoA - pusher_start_AoA) / pusher_working_angle);
   }
 
-  # TODO: Axis mapping!
+  # Simulator axis, mapped to joystick axis in fg-haptic executable
   var axis_x = stick_force_path.getNode("aileron", 1);
   if(axis_x != nil) axis_x.setValue(-aileron_force);
 
@@ -278,7 +280,7 @@ var update_forces = func {
 
 
 ###
-# Trim functions
+# Force trim functions
 controls.aileronTrim = func(rate) {
   if(!enable_force_trim_aileron.getValue())
     origAileronTrim(rate);
@@ -299,29 +301,41 @@ controls.rudderTrim = func(rate) {
 };
 
 
-var save_config = func {
-  # Save configuration of all devices
+var save_config_default = func {
+  # Save configuration of all devices as a default
 
-  # Then save the haptic tree to file
-  var filename = getprop("/sim/fg-home") ~ "/Export/haptic-config.xml";
+  var filename = getprop("/sim/fg-home") ~ "/Export/haptic-default.xml";
   if(io.write_properties( path: filename, prop: "/haptic" ) != nil) {
-    gui.popupTip("Configuration saved succesfully");
+    gui.popupTip("Haptic default configuration saved succesfully");
   } else {
     gui.popupTip("Error while saving configuration");
   }
 };
 
-var load_config = func {
+var save_config_aircraft = func {
+  # Save configuration of all devices for this aircraft
+
+  var filename = getprop("/sim/fg-home") ~ "/Export/haptic-" ~ getprop("/sim/aircraft-id") ~ ".xml";
+  if(io.write_properties( path: filename, prop: "/haptic" ) != nil) {
+    gui.popupTip("Haptic aircraft configuration saved succesfully");
+  } else {
+    gui.popupTip("Error while saving configuration");
+  }
+};
+
+
+var load_config_file = func(filename = "default", notice = 1) {
   var value = nil;
 
-  # Load configuration from exported XML
+  # Load default configuration from exported XML
   var hapticNode = props.globals.getNode("/haptic");
 
-  var filename = getprop("/sim/fg-home") ~ "/Export/haptic-config.xml";
+  var filename = getprop("/sim/fg-home") ~ "/Export/haptic-" ~ filename ~".xml";
   var config = io.read_properties( path: filename);
   if(config == nil) {
-    gui.popupTip("Could not load force-feedback configuration");
-    return;
+    if(notice == 1)
+      gui.popupTip("Could not load force-feedback configuration: " ~ filename);
+    return 0;
   }
 
   # Set global properties according to saved file
@@ -347,14 +361,17 @@ var load_config = func {
         break;
       }
     }
-    if(index ==  nil) continue;
-  
+    if(index ==  nil) continue;   # No matching device found
+
     # Fill device parameter properties
     value = old_devices[i].getValue("autocenter");
     if(value != nil) devices[j].setValue("autocenter", value);
 
     value = old_devices[i].getValue("gain");
     if(value != nil) devices[j].setValue("gain", value);
+
+    value = old_devices[i].getValue("low-pass-filter");
+    if(value != nil) devices[j].setValue("low-pass-filter", value);
 
     value = old_devices[i].getValue("pilot/gain");
     if(value != nil) devices[j].setValue("pilot/gain", value);
@@ -389,13 +406,77 @@ var load_config = func {
     if(value != nil) devices[j].setValue("ground-rumble/mode", value);
   }
 
+  # Update aircraft setup if in config
+  var ac_setup = config.getValue("aircraft-setup");
+  if(ac_setup != nil) {
+    value = ac_setup.getValue("aircraft-setup/aileron-max-deflection-deg");
+    if(value != nil) hapticNode.setValue("aircraft-setup/aileron-max-deflection-deg", value);
+    value = ac_setup.getValue("aircraft-setup/elevator-max-deflection-deg");
+    if(value != nil) hapticNode.setValue("aircraft-setup/elevator-max-deflection-deg", value);
+    value = ac_setup.getValue("aircraft-setup/rudder-max-deflection-deg");
+    if(value != nil) hapticNode.setValue("aircraft-setup/rudder-max-deflection-deg", value);
+
+    value = ac_setup.getValue("aircraft-setup/aileron-gain");
+    if(value != nil) hapticNode.setValue("aircraft-setup/aileron-gain", value);
+    value = ac_setup.getValue("aircraft-setup/elevator-gain");
+    if(value != nil) hapticNode.setValue("aircraft-setup/elevator-gain", value);
+    value = ac_setup.getValue("aircraft-setup/rudder-gain");
+    if(value != nil) hapticNode.setValue("aircraft-setup/rudder-gain", value);
+    value = ac_setup.getValue("aircraft-setup/g-force-gain");
+    if(value != nil) hapticNode.setValue("aircraft-setup/g-force-gain", value);
+    value = ac_setup.getValue("aircraft-setup/slip-gain");
+    if(value != nil) hapticNode.setValue("aircraft-setup/slip-gain", value);
+
+    value = ac_setup.getValue("aircraft-setup/stall-AoA");
+    if(value != nil) hapticNode.setValue("aircraft-setup/stall-AoA", value);
+    value = ac_setup.getValue("aircraft-setup/pusher-start-AoA");
+    if(value != nil) hapticNode.setValue("aircraft-setup/pusher-start-AoA", value);
+    value = ac_setup.getValue("aircraft-setup/pusher-working-angle-deg");
+    if(value != nil) hapticNode.setValue("aircraft-setup/pusher-working-angle-deg", value);
+    value = ac_setup.getValue("aircraft-setup/wing-shadow-AoA");
+    if(value != nil) hapticNode.setValue("aircraft-setup/wing-shadow-AoA", value);
+    value = ac_setup.getValue("aircraft-setup/wing-shadow-angle-deg");
+    if(value != nil) hapticNode.setValue("aircraft-setup/wing-shadow-angle-deg", value);
+    value = ac_setup.getValue("aircraft-setup/stick-shaker-AoA");
+    if(value != nil) hapticNode.setValue("aircraft-setup/stick-shaker-AoA", value);
+
+    # Apply the variables
+    update_aircraft_setup();
+  }
+
   # Update dialog
-  gui.popupTip("Force-feedback configuration loaded");
+  if(notice == 1)
+    gui.popupTip("Force-feedback configuration loaded");
+  return 1
+};
+
+# Load default haptic configuration from file
+var load_config_default = func(notice = 1) {
+  return load_config_file("default", notice);
+};
+
+# Load aircraft specific configuration from file
+var load_config_aircraft = func(notice = 1) {
+  return load_config_file(getprop("/sim/aircraft-id"), notice);
+};
+
+# Load first the default, then the aircraft specific configuration
+# This is intended for when the simulation first starts and devices
+# are written to flightgear from fg-haptic
+var load_config_all = func {
+  var success = 0;
+  success = load_config_default(0);
+  success = success + load_config_aircraft(0);
+
+  if(success == 0)
+    gui.popupTip("Force feedback configuration could not be loaded");
+  else
+    gui.popupTip("Force feedback configuration loaded!");
 };
 
 ###
-# Read aircraft properties when fdm is ready
-_setlistener("/sim/signals/fdm-initialized", func {
+# Update aircraft setup from haptic tree
+var update_aircraft_setup = func {
   # Read aircraft setup
   aileron_max_deflection = getprop("/haptic/aircraft-setup/aileron-max-deflection-deg")*0.01745329;
   elevator_max_deflection = getprop("/haptic/aircraft-setup/elevator-max-deflection-deg")*0.01745329;
@@ -413,15 +494,15 @@ _setlistener("/sim/signals/fdm-initialized", func {
   wing_shadow_AoA = getprop("/haptic/aircraft-setup/wing-shadow-AoA")*0.01745329;
   wing_shadow_angle = getprop("/haptic/aircraft-setup/wing-shadow-angle-deg")*0.01745329;
   stick_shaker_AoA = getprop("/haptic/aircraft-setup/stick-shaker-AoA")*0.01745329;
-});
+};
+
+# Read aircraft properties when fdm is ready
+_setlistener("/sim/signals/fdm-initialized", update_aircraft_setup);
 
 
-###
-# Main initialization
-_setlistener("/sim/signals/nasal-dir-initialized", func {
-  # Add default parameters to property tree
-  
-  # TODO: Update constants from aircraft setup?
+##
+# Initialize default variables
+var init_aircraft_setup = func() {
   props.globals.initNode("/haptic/aircraft-setup/aileron-max-deflection-deg", aileron_max_deflection/0.01745329, "DOUBLE");
   props.globals.initNode("/haptic/aircraft-setup/elevator-max-deflection-deg", elevator_max_deflection/0.01745329, "DOUBLE");
   props.globals.initNode("/haptic/aircraft-setup/rudder-max-deflection-deg", rudder_max_deflection/0.01745329, "DOUBLE");
@@ -438,6 +519,14 @@ _setlistener("/sim/signals/nasal-dir-initialized", func {
   props.globals.initNode("/haptic/aircraft-setup/wing-shadow-AoA", wing_shadow_AoA/0.01745329, "DOUBLE");
   props.globals.initNode("/haptic/aircraft-setup/wing-shadow-angle-deg", wing_shadow_angle/0.01745329, "DOUBLE");
   props.globals.initNode("/haptic/aircraft-setup/stick-shaker-AoA", stick_shaker_AoA/0.01745329, "DOUBLE");
+};
+
+###
+# Main initialization
+_setlistener("/sim/signals/nasal-dir-initialized", func {
+  # Add default parameters to property tree
+  
+  init_aircraft_setup();
 
   enable_force_trim_aileron = props.globals.initNode("/haptic/enable-force-trim-aileron", 0, "BOOL");
   enable_force_trim_elevator = props.globals.initNode("/haptic/enable-force-trim-elevator", 0, "BOOL");
@@ -459,10 +548,10 @@ _setlistener("/sim/signals/nasal-dir-initialized", func {
     
   var devices_sent = props.globals.getValue("/haptic/devices-reconfigured");
   if(devices_sent == nil) props.globals.initNode("/haptic/devices-reconfigured", 0, "DOUBLE");
-  else load_config();
+  else load_config_default();
   
   # When devices are written the first time, load the saved configuration from disk
-  _setlistener("/haptic/devices-reconfigured", load_config);
+  _setlistener("/haptic/devices-reconfigured", load_config_all);
 
   # Request fg-haptic to send device data
   props.globals.initNode("/haptic/reconfigure", 2, "INT");

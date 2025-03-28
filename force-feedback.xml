@@ -673,20 +673,35 @@
   <group>
     <layout>hbox</layout>
 	
-	<!-- Save button -->
+    <!-- Save buttons -->
     <button>
-      <legend>Save</legend>
+      <legend>Save aircraft</legend>
       <binding>
         <command>nasal</command>
-        <script>applyChanges(); force_feedback.save_config();</script>
+        <script>applyChanges(); force_feedback.save_config_aircraft();</script>
       </binding>
     </button>
-	<!-- Load button -->
     <button>
-      <legend>Load</legend>
+      <legend>Save default</legend>
       <binding>
         <command>nasal</command>
-        <script>force_feedback.load_config(); changeDevice();</script>
+        <script>applyChanges(); force_feedback.save_config_default();</script>
+      </binding>
+    </button>
+
+    <!-- Load buttons -->
+    <button>
+      <legend>Load aircraft</legend>
+      <binding>
+        <command>nasal</command>
+        <script>force_feedback.load_config_aircraft(); changeDevice();</script>
+      </binding>
+    </button>
+    <button>
+      <legend>Load default</legend>
+      <binding>
+        <command>nasal</command>
+        <script>force_feedback.load_config_default(); changeDevice();</script>
       </binding>
     </button>
 
@@ -852,6 +867,7 @@
             var combo = gui.findElementByName(cmdarg(), boxelement);
             if(combo == nil) continue;
             combo.removeChildren("value");
+            combo.addChild("value").setValue("None");
             if(stick_axes > 0)  {
                 combo.addChild("value").setValue("X");
                 combo.addChild("value").setValue("-X");
@@ -912,13 +928,13 @@
         else setprop("/sim/gui/dialogs/force-feedback/pilot-g-x", getAxisName(effect, pilot_axis));
 
         var axes = getprop("/haptic/device[" ~ dev ~ "]/axes");
-        if(axes != nil and axes > 1) {
+        if(axes != nil) {
           effect = getprop("/haptic/device[" ~ dev ~ "]/pilot/y");
           if(effect == nil) setprop("/sim/gui/dialogs/force-feedback/pilot-g-y", "X");
           else setprop("/sim/gui/dialogs/force-feedback/pilot-g-y", getAxisName(effect, pilot_axis));
         } else setprop("/sim/gui/dialogs/force-feedback/pilot-g-y", "None");
 
-        if(axes != nil and axes > 2) {
+        if(axes != nil) {
           effect = getprop("/haptic/device[" ~ dev ~ "]/pilot/z");
           if(effect == nil) setprop("/sim/gui/dialogs/force-feedback/pilot-g-z", "Z");
           else setprop("/sim/gui/dialogs/force-feedback/pilot-g-z", getAxisName(effect, pilot_axis));
@@ -961,13 +977,13 @@
         if(effect == nil) setprop("/sim/gui/dialogs/force-feedback/control-surface-x", "-X");
         else setprop("/sim/gui/dialogs/force-feedback/control-surface-x", getAxisName(effect, stick_axis));
 
-        if(axes != nil and axes > 1) {
+        if(axes != nil) {
           effect = getprop("/haptic/device[" ~ dev ~ "]/stick-force/y");
           if(effect == nil) setprop("/sim/gui/dialogs/force-feedback/control-surface-y", "-Y");
           else setprop("/sim/gui/dialogs/force-feedback/control-surface-y", getAxisName(effect, stick_axis));
         } else setprop("/sim/gui/dialogs/force-feedback/control-surface-y", "None");
 
-        if(axes != nil and axes > 2) {
+        if(axes != nil) {
           effect = getprop("/haptic/device[" ~ dev ~ "]/stick-force/z");
           if(effect == nil) setprop("/sim/gui/dialogs/force-feedback/control-surface-z", "Z");
           else setprop("/sim/gui/dialogs/force-feedback/control-surface-z", getAxisName(effect, stick_axis));
