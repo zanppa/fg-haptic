@@ -3,9 +3,9 @@ Fg-Haptic
 
 Force feedback (haptic) support for Flight Gear flight simulator
 
-Version 0.6
+Version 1.0.0
 
-Copyright (C) Lauri Peltonen, 2011, 2020
+Copyright (C) Lauri Peltonen, 2011, 2020, 2025
 
 This program is released under GPLv2 or later.
 

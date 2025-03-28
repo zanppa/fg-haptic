@@ -9,7 +9,7 @@
   <addon>
       <identifier type="string">user.zanppa.fghaptic</identifier>
       <name type="string">FGHaptic</name>
-      <version type="string">0.6.0</version>
+      <version type="string">1.0.0</version>
 
       <authors>
         <author>
