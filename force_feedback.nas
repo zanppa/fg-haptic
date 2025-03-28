@@ -6,20 +6,20 @@ var update_interval = 0.05;
 # aileron angles of 20 deg positive and -14 deg negative I think
 # and Vne around 150 knots
 # Stall AoA is assumed to be around 17-18 degrees, and stalls at about 22 deg
-var aileron_max_deflection = 20.0*0.01745329;
-var elevator_max_deflection = 20.0*0.01745329;
-var rudder_max_deflection = 20.0*0.01745329;
+var aileron_max_deflection = 20.0*0.01745329;  # Degrees to radians
+var elevator_max_deflection = 20.0*0.01745329;  # Deg to rad
+var rudder_max_deflection = 20.0*0.01745329;  # Deg to rad
 var aileron_gain = 0.05;
 var elevator_gain = 0.05;
 var g_force_gain = 0.003;
 var rudder_gain = 3.0;
 var slip_gain = 1.0;
-var stall_AoA = 22.0*0.01745329;
-var pusher_start_AoA = 900.0*0.01745329;
-var pusher_working_angle = 900.0*0.01745329;
-var wing_shadow_AoA = 900.0*0.01745329;
-var wing_shadow_angle = 900.0*0.01745329;
-var stick_shaker_AoA = 17.0*0.01745329;
+var stall_AoA = 22.0*0.01745329;  # To rad
+var pusher_start_AoA = 900.0*0.01745329; # To rad
+var pusher_working_angle = 900.0*0.01745329; # Rad
+var wing_shadow_AoA = 900.0*0.01745329; # Rad
+var wing_shadow_angle = 900.0*0.01745329; # rad
+var stick_shaker_AoA = 17.0*0.01745329; # rad
 
 var enable_force_trim_aileron = nil;
 var enable_force_trim_elevator = nil;
@@ -86,14 +86,17 @@ var update_stick_forces = func(path) {
   if(mode_path != nil) mode = mode_path.getValue();
 
   var airspeed = getprop("/velocities/airspeed-kt");
-  var AoA = getprop("/orientation/alpha-deg")*0.01745329;
-  var slip_angle = getprop("/orientation/side-slip-deg")*0.01745329;
+  var AoA = getprop("/orientation/alpha-deg")*0.01745329; # From deg to rad
+  var slip_angle = getprop("/orientation/side-slip-deg")*0.01745329;  # From deg to rad
   var density = getprop("/environment/density-slugft3");
   var g_force = getprop("/accelerations/pilot/z-accel-fps_sec") + 32.174;
 
   # Basic forces from air flow, taking slip into account if desirable
   # 0.5 * air_density * airspeed^2 * drag_coeff (assuming 2) * Area
   var base_force = density * airspeed * airspeed;
+
+  # Slip gain, not unitu when air stream is not perpendicular to the control surfaces
+  slip_gain = 1.0 - slip_gain * math.sin(slip_angle);
 
   # In normal mode the spring effect force gain depends only on
   # airspeed, density and surface area. Stick calculates the actual
@@ -112,11 +115,9 @@ var update_stick_forces = func(path) {
     var elevator_angle = (getprop("/controls/flight/elevator") + elevator_trim_prop.getValue()) * elevator_max_deflection;
     var rudder_angle = (getprop("/controls/flight/rudder") + rudder_trim_prop.getValue()) * rudder_max_deflection;
 
-    # TODO: Check whether AoA should be + or -!
+    # TODO: Check whether AoA and slip angle should be + or -!
     elevator_angle = elevator_angle + AoA;
     rudder_angle = rudder_angle - slip_angle;
-
-    slip_gain = 1.0 - slip_gain * math.sin(slip_angle);
 
     # Invert all forces here by default, so selecting "X" or "Y" should give correct result
 
@@ -127,11 +128,19 @@ var update_stick_forces = func(path) {
 
     rudder_force = -rudder_force * math.sin(rudder_angle);
   } else {
-    # In normal mode scale according to max deflection to have approximately same scaling as alternate mode
+    # Normal mode using spring effect
+    # Spring force is basically just the base force, i.e. airspeed squared
+
+    # Scale according to max deflection to have approximately same scaling as alternate mode
     aileron_force = aileron_force * math.sin(aileron_max_deflection);
     elevator_force = elevator_force * math.sin(elevator_max_deflection);
     rudder_force = rudder_force * math.sin(rudder_max_deflection);
+
+    # Apply effect of slip to aileron and elevator also here
+    aileron_force = aileron_force * slip_gain;
+    elevator_force = elevator_force * slip_gain;
   }
+
 
 
   # Stall condition, assuming rudder wont stall
@@ -139,7 +148,7 @@ var update_stick_forces = func(path) {
   # the stick forces are zero
   var stall_coeff = (AoA / stall_AoA);
   stall_coeff = stall_coeff * stall_coeff * stall_coeff * stall_coeff;
-  if(stall_coeff > 1.0) stall_coeff = 1.0;
+  stall_coeff = math.clamp(stall_coeff, 0.0, 1.0);
 
   elevator_force = elevator_force * (1 - stall_coeff);
   aileron_force = aileron_force * (1 - stall_coeff);
@@ -153,7 +162,7 @@ var update_stick_forces = func(path) {
       var shadow = (AoA - wing_shadow_AoA - 0.5 * wing_shadow_angle);
       shadow = shadow / (wing_shadow_angle * 0.5);
       shadow = shadow * shadow;
-      if(shadow > 1.0) shadow = 1.0;
+      shadow = math.clamp(shadow, 0.0, 1.0);
       elevator_force = elevator_force * shadow;
     }
   }
@@ -170,9 +179,12 @@ var update_stick_forces = func(path) {
   }
   
   # Stick pusher
-  if(pusher_start_AoA != nil and pusher_working_angle != nil) {
-    if(AoA > pusher_start_AoA)
-      elevator_force = elevator_force - ((AoA - pusher_start_AoA) / pusher_working_angle);
+  if(pusher_start_AoA != nil and pusher_start_AoA > 0 and pusher_working_angle != nil and pusher_working_angle > 0.1) {
+    if(AoA > pusher_start_AoA) {
+      var pusher_add = ((AoA - pusher_start_AoA) / pusher_working_angle);
+      pusher_add = math.clamp(pusher_add, 0.0, 1.0);
+      elevator_force = elevator_force - pusher_add;
+    }
   }
 
   # Simulator axis, mapped to joystick axis in fg-haptic executable
@@ -472,6 +484,19 @@ var load_config_all = func {
     gui.popupTip("Force feedback configuration could not be loaded");
   else
     gui.popupTip("Force feedback configuration loaded!");
+
+  return success;
+};
+
+# Load config file after devices have been written by fg-haptic
+# and then ask fg-haptic to read the configuration back
+var load_config_after_reconf = func {
+  if(getprop("/haptic/devices-reconfigured") < 1)
+    return;
+
+  setprop("/haptic/devices-reconfigured", 0);	# Mark that this has been handled
+  if(load_config_all() > 0)
+    setprop("/haptic/reconfigure", 1);	# Ask fg-haptic to read loaded configuration if config was loaded
 };
 
 ###
@@ -551,7 +576,7 @@ _setlistener("/sim/signals/nasal-dir-initialized", func {
   else load_config_default();
   
   # When devices are written the first time, load the saved configuration from disk
-  _setlistener("/haptic/devices-reconfigured", load_config_all);
+  _setlistener("/haptic/devices-reconfigured", load_config_after_reconf);
 
   # Request fg-haptic to send device data
   props.globals.initNode("/haptic/reconfigure", 2, "INT");
