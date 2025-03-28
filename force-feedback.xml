@@ -545,9 +545,80 @@
 
     <!-- Right side -->
 
-    <!-- Ground rumble effect -->
     <group>
       <layout>vbox</layout>
+
+      <!-- Friction and damping -->
+
+      <group>
+        <layout>hbox</layout>
+
+        <text>
+          <label>Friction</label>
+          <enable><property>/sim/gui/dialogs/force-feedback/friction-enable</property></enable>
+        </text>
+        <slider>
+          <name>friction</name>
+          <!-- <width>100</width> -->
+          <property>/sim/gui/dialogs/force-feedback/friction</property>
+          <min>0</min>
+          <max>1</max>
+          <step>0.01</step>
+          <binding>
+            <command>dialog-apply</command>
+          </binding>
+          <binding>
+            <command>nasal</command>
+            <script>applyChanges();</script>
+          </binding>
+          <live>true</live>
+          <enable><property>/sim/gui/dialogs/force-feedback/friction-enable</property></enable>
+        </slider>
+        <text>
+          <label>0.00</label>
+          <property>/sim/gui/dialogs/force-feedback/friction</property>
+          <format>%-0.2f</format>
+          <live>true</live>
+          <enable><property>/sim/gui/dialogs/force-feedback/friction-enable</property></enable>
+        </text>
+      </group>
+
+      <group>
+        <layout>hbox</layout>
+
+        <text>
+          <label>Damping</label>
+          <enable><property>/sim/gui/dialogs/force-feedback/damping-enable</property></enable>
+        </text>
+        <slider>
+          <name>damping</name>
+          <!-- <width>100</width> -->
+          <property>/sim/gui/dialogs/force-feedback/damping</property>
+          <min>0</min>
+          <max>1</max>
+          <step>0.01</step>
+          <binding>
+            <command>dialog-apply</command>
+<!--          <object-name>gain</object-name> -->
+          </binding>
+          <binding>
+            <command>nasal</command>
+            <script>applyChanges();</script>
+          </binding>
+          <live>true</live>
+          <enable><property>/sim/gui/dialogs/force-feedback/damping-enable</property></enable>
+        </slider>
+        <text>
+          <label>0.00</label>
+          <property>/sim/gui/dialogs/force-feedback/damping</property>
+          <format>%-0.2f</format>
+          <live>true</live>
+          <enable><property>/sim/gui/dialogs/force-feedback/damping-enable</property></enable>
+        </text>
+      </group>
+
+
+      <!-- Ground rumble effect -->
 
       <!-- Name -->
       <group>
@@ -556,9 +627,9 @@
         <hrule><stretch>1</stretch></hrule>
       </group>
 
-	  <group>
-	    <layout>hbox</layout>
-	    <text><label>Mode</label><enable><property>/sim/gui/dialogs/force-feedback/ground-rumble-enable</property></enable></text>
+      <group>
+        <layout>hbox</layout>
+        <text><label>Mode</label><enable><property>/sim/gui/dialogs/force-feedback/ground-rumble-enable</property></enable></text>
         <combo>
           <name>ground-rumble-mode</name>
           <!-- <width>400</width> -->
@@ -577,7 +648,7 @@
             <script>applyChanges();</script>
           </binding>
         </combo>
-	  </group>
+      </group>
 
       <!-- Slider -->
       <group>
@@ -609,9 +680,10 @@
           <enable><property>/sim/gui/dialogs/force-feedback/ground-rumble-enable</property></enable>
         </text>
       </group>
+
     </group>
 
-	<empty><stretch>1</stretch></empty>
+    <empty><stretch>1</stretch></empty>
 	
   </group>
 
@@ -796,6 +868,8 @@
             # Found the device number, apply all values there!
             setprop("/haptic/device[" ~ i ~ "]/autocenter", getprop("/sim/gui/dialogs/force-feedback/autocenter"));
             setprop("/haptic/device[" ~ i ~ "]/gain", getprop("/sim/gui/dialogs/force-feedback/gain"));
+            setprop("/haptic/device[" ~ i ~ "]/friction", getprop("/sim/gui/dialogs/force-feedback/friction"));
+            setprop("/haptic/device[" ~ i ~ "]/damping", getprop("/sim/gui/dialogs/force-feedback/damping"));
             setprop("/haptic/device[" ~ i ~ "]/pilot/gain", getprop("/sim/gui/dialogs/force-feedback/pilot-g-strength"));
             setprop("/haptic/device[" ~ i ~ "]/pilot/x", getAxisNumber("/sim/gui/dialogs/force-feedback/pilot-g-x", pilot_axis));
             setprop("/haptic/device[" ~ i ~ "]/pilot/y", getAxisNumber("/sim/gui/dialogs/force-feedback/pilot-g-y", pilot_axis));
@@ -915,6 +989,28 @@
         effect = getprop("/haptic/device[" ~ dev ~ "]/gain-supported");
         if((effect == nil) or (effect == 0)) setprop("/sim/gui/dialogs/force-feedback/gain-enable", "false");
         else setprop("/sim/gui/dialogs/force-feedback/gain-enable", "true");
+
+
+        # FRICTION
+
+        effect = getprop("/haptic/device[" ~ dev ~ "]/friction");
+        if(effect == nil) effect = 0.0;
+        setprop("/sim/gui/dialogs/force-feedback/friction", effect);
+
+        effect = getprop("/haptic/device[" ~ dev ~ "]/friction-supported");
+        if((effect == nil) or (effect == 0)) setprop("/sim/gui/dialogs/force-feedback/friction-enable", "false");
+        else setprop("/sim/gui/dialogs/force-feedback/friction-enable", "true");
+
+
+        # DAMPING
+
+        effect = getprop("/haptic/device[" ~ dev ~ "]/damping");
+        if(effect == nil) effect = 0.0;
+        setprop("/sim/gui/dialogs/force-feedback/damping", effect);
+
+        effect = getprop("/haptic/device[" ~ dev ~ "]/damping-supported");
+        if((effect == nil) or (effect == 0)) setprop("/sim/gui/dialogs/force-feedback/damping-enable", "false");
+        else setprop("/sim/gui/dialogs/force-feedback/damping-enable", "true");
 
 
         # PILOT G FORCES

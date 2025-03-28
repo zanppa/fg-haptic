@@ -43,9 +43,10 @@
 #define SPRING		3
 #define STICK_SHAKER	4
 #define GROUND_NOTCH	5
-/* #define FRICTION	5 */
+#define FRICTION	6
+#define DAMPING		7
 
-#define EFFECTS		9
+#define EFFECTS		9	// Maximum effects
 
 
 #define MODE_OFF	-1
@@ -116,6 +117,8 @@ typedef struct __hapticdevice {
 	float stick_gain;
 	float shaker_gain;
 	float rumble_gain;
+	float friction;
+	float damping;
 
 	signed char rumble_mode;
 	signed char stick_mode;
@@ -307,6 +310,14 @@ void send_devices(void)
 			fgfswrite(telnet_sock, "set /haptic/device[%d]/autocenter %f", i, devices[i].autocenter);
 			fgfswrite(telnet_sock, "set /haptic/device[%d]/autocenter-supported 1", i);
 		}
+		if (devices[i].supported & SDL_HAPTIC_FRICTION) {
+			fgfswrite(telnet_sock, "set /haptic/device[%d]/friction %f", i, devices[i].friction);
+			fgfswrite(telnet_sock, "set /haptic/device[%d]/friction-supported 1", i);
+		}
+		if (devices[i].supported & SDL_HAPTIC_DAMPER) {
+			fgfswrite(telnet_sock, "set /haptic/device[%d]/damping %f", i, devices[i].damping);
+			fgfswrite(telnet_sock, "set /haptic/device[%d]/damping-supported 1", i);
+		}
 	}
 
 	// Tell fgfs that we have reconfigured the property tree for haptic devices
@@ -360,6 +371,7 @@ void read_devices(void)
 				}
 			}
 		}
+
 		// Constant force -> pilot G forces and aileron loading
 		// Currently support 3 axis only
 		if (devices[i].supported & SDL_HAPTIC_CONSTANT) {
@@ -465,6 +477,31 @@ void read_devices(void)
 					devices[i].shaker_gain = fdata;
 			}
 		}
+
+		if (devices[i].supported & SDL_HAPTIC_FRICTION) {
+			fgfswrite(telnet_sock, "get /haptic/device[%d]/friction", i);
+			p = fgfsread(telnet_sock, READ_TIMEOUT);
+			if (p) {
+				read = sscanf(p, "%f", &fdata);
+				if (read == 1) {
+					devices[i].friction = fdata;
+					printf("    Friction %f\n", fdata);
+				}
+			}
+		}
+
+		if (devices[i].supported & SDL_HAPTIC_DAMPER) {
+			fgfswrite(telnet_sock, "get /haptic/device[%d]/damping", i);
+			p = fgfsread(telnet_sock, READ_TIMEOUT);
+			if (p) {
+				read = sscanf(p, "%f", &fdata);
+				if (read == 1) {
+					devices[i].damping = fdata;
+					printf("    Damping %f\n", fdata);
+				}
+			}
+		}
+
 	}
 
 	int retries = 0;
@@ -647,6 +684,50 @@ void create_effects(void)
 				// devices[i].supported &= ~SDL_HAPTIC_CONSTANT;
 			}
 			printf("\tConstant force Z\n");
+		}
+
+		// Friction effect, force opposing velocity, currently constant gain for all axis
+		if (devices[i].supported & SDL_HAPTIC_FRICTION && devices[i].friction > 0.001) {
+			printf("\tFriction effect\n");
+			devices[i].effect[FRICTION].type = SDL_HAPTIC_FRICTION;
+			devices[i].effect[FRICTION].condition.length = SDL_HAPTIC_INFINITY;
+
+			for(int j = 0; j < AXES; j++) {
+				devices[i].effect[FRICTION].condition.left_sat[j] = 0xFFFF;
+				devices[i].effect[FRICTION].condition.right_sat[j] = 0xFFFF;
+				devices[i].effect[FRICTION].condition.left_coeff[j] = 32760 * devices[i].friction;
+				devices[i].effect[FRICTION].condition.right_coeff[j] = 32760 * devices[i].friction;
+				devices[i].effect[FRICTION].condition.deadband[j] = 0;
+				devices[i].effect[FRICTION].condition.center[j] = 0;
+			}
+
+			devices[i].effectId[FRICTION] = SDL_HapticNewEffect(devices[i].device, &devices[i].effect[FRICTION]);
+			if (devices[i].effectId[FRICTION] < 0) {
+				printf("UPLOADING EFFECT ERROR: %s\n", SDL_GetError());
+				devices[i].effectId[FRICTION] = -1;
+			}
+		}
+
+		// Daping effect, force opposing acceleration, constant gain in all axis
+		if (devices[i].supported & SDL_HAPTIC_DAMPER && devices[i].damping > 0.001) {
+			printf("\tDamping effect\n");
+			devices[i].effect[DAMPING].type = SDL_HAPTIC_DAMPER;
+			devices[i].effect[DAMPING].condition.length = SDL_HAPTIC_INFINITY;
+
+			for(int j = 0; j < AXES; j++) {
+				devices[i].effect[DAMPING].condition.left_sat[j] = 0xFFFF;
+				devices[i].effect[DAMPING].condition.right_sat[j] = 0xFFFF;
+				devices[i].effect[DAMPING].condition.left_coeff[j] = 32760 * devices[i].damping;
+				devices[i].effect[DAMPING].condition.right_coeff[j] = 32760 * devices[i].damping;
+				devices[i].effect[DAMPING].condition.deadband[j] = 0;
+				devices[i].effect[DAMPING].condition.center[j] = 0;
+			}
+
+			devices[i].effectId[DAMPING] = SDL_HapticNewEffect(devices[i].device, &devices[i].effect[DAMPING]);
+			if (devices[i].effectId[DAMPING] < 0) {
+				printf("UPLOADING EFFECT ERROR: %s\n", SDL_GetError());
+				devices[i].effectId[DAMPING] = -1;
+			}
 		}
 
 	}
@@ -1120,12 +1201,26 @@ int main(int argc, char **argv)
 				devices[i].params.shaker_trigger = new_params.shaker_trigger;
 			}
 
+			// Launch friction
+			if (devices[i].effectId[FRICTION] != -1 && start_effects) {
+				reload_effect(&devices[i], &devices[i].effect[FRICTION], &devices[i].effectId[FRICTION], true);
+			}
+
+			// Launch damping
+			if (devices[i].effectId[DAMPING] != -1 && start_effects) {
+				reload_effect(&devices[i], &devices[i].effect[DAMPING], &devices[i].effectId[DAMPING], true);
+			}
+
 			start_effects = false;
 		}
 
 		// Reconfigure the system if reconfiguration was requested
 		//printf("%d %d\n", reconf_request, old_reconf);
 		if (reconf_request && !old_reconf) {
+			// Stop all effects from playing when reconfiguring
+			for(int i = 0; i < num_devices; i++)
+				SDL_HapticStopAll(devices[i].device);
+
 			if(reconf_request > 1)
 				send_devices();
 
