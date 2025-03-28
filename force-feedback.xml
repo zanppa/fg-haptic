@@ -203,7 +203,7 @@
             <!-- <width>100</width> -->
             <property>/sim/gui/dialogs/force-feedback/control-surface-strength</property>
             <min>0</min>
-            <max>5</max>
+            <max>3</max>
             <step>0.01</step>
             <binding>
               <command>dialog-apply</command>
@@ -346,7 +346,7 @@
             <!-- <width>100</width> -->
             <property>/sim/gui/dialogs/force-feedback/pilot-g-strength</property>
             <min>0</min>
-            <max>5</max>
+            <max>2</max>
             <step>0.01</step>
             <binding>
               <command>dialog-apply</command>
@@ -659,7 +659,7 @@
           <!-- <width>100</width> -->
           <property>/sim/gui/dialogs/force-feedback/ground-rumble-strength</property>
           <min>0</min>
-          <max>5</max>
+          <max>1</max>
           <step>0.01</step>
           <binding>
             <command>dialog-apply</command>
