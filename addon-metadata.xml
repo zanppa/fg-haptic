@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<PropertyList>
+  <meta>
+      <file-type type="string">FlightGear add-on metadata</file-type>
+      <format-version type="int">1</format-version>
+  </meta>
+
+  <addon>
+      <identifier type="string">user.zanppa.fghaptic</identifier>
+      <name type="string">FGHaptic</name>
+      <version type="string">0.6.0</version>
+
+      <authors>
+        <author>
+          <name type="string">Lauri Peltonen</name>
+          <email type="string"></email>
+          <url type="string"></url>
+        </author>
+      </authors>
+
+      <maintainers>
+        <maintainer>
+          <name type="string">Lauri Peltonen</name>
+          <email type="string"></email>
+          <url type="string">https://github.com/zanppa/fg-haptic/</url>
+        </maintainer>
+      </maintainers>
+
+      <short-description type="string">
+        Add force-feedback effects to FlightGear.
+      </short-description>
+
+      <long-description type="string">
+        Add force-feedback effects to FlightGear. Requires external executable and this add-on. Uses SDL2.
+      </long-description>
+
+      <license>
+        <designation type="string">
+          GNU GPL version 2 or later
+        </designation>
+
+        <file type="string">
+          LICENSE
+        </file>
+
+        <url type="string">
+          https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html
+        </url>
+      </license>
+
+      <min-FG-version type="string">2020.4.0</min-FG-version>
+      <max-FG-version type="string">none</max-FG-version>
+
+      <urls>
+        <home-page type="string">
+          https://github.com/zanppa/fg-haptic/
+        </home-page>
+
+        <download type="string">
+          https://github.com/zanppa/fg-haptic/
+        </download>
+
+        <support type="string">
+          https://github.com/zanppa/fg-haptic/
+        </support>
+
+        <code-repository type="string">
+          https://github.com/zanppa/fg-haptic/
+        </code-repository>
+      </urls>
+
+      <tags>
+        <tag type="string">haptic</tag>
+        <tag type="string">development</tag>
+      </tags>
+
+      <localized>
+      </localized>
+  </addon>
+</PropertyList>

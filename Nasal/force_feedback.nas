@@ -292,7 +292,7 @@ var update_forces = func {
   }
 
   # Reset timer
-  settimer(update_forces, update_interval);
+  #settimer(update_forces, update_interval);
 };
 
 
@@ -565,9 +565,13 @@ var init_aircraft_setup = func() {
   props.globals.initNode("/haptic/aircraft-setup/stick-shaker-airspeed", stick_shaker_airspeed, "DOUBLE");
 };
 
+
+var load_conf_listener = nil;
+var haptic_update_timer = nil;
+
 ###
 # Main initialization
-_setlistener("/sim/signals/nasal-dir-initialized", func {
+var force_feedback_main_init = func() {
   # Add default parameters to property tree
   
   init_aircraft_setup();
@@ -589,7 +593,8 @@ _setlistener("/sim/signals/nasal-dir-initialized", func {
   else load_config_default();
   
   # When devices are written the first time, load the saved configuration from disk
-  _setlistener("/haptic/devices-reconfigured", load_config_after_reconf);
+  if(load_conf_listener != nil) removelistener(load_conf_listener);
+  load_conf_listener = setlistener("/haptic/devices-reconfigured", load_config_after_reconf);
 
   # Request fg-haptic to send device data
   props.globals.initNode("/haptic/reconfigure", 2, "INT");
@@ -626,5 +631,13 @@ _setlistener("/sim/signals/nasal-dir-initialized", func {
   fgcommand("reinit", props.Node.new({subsystem:"gui"}));
 
   # Set timer for main loop
-  settimer(update_forces, update_interval);
-});
+  #settimer(update_forces, update_interval);
+  if(haptic_update_timer == nil) {
+    haptic_update_timer = maketimer(update_interval, update_forces);
+    haptic_update_timer.start();
+  }
+};
+
+
+# Default initialization if manual installation
+setlistener("/sim/signals/nasal-dir-initialized", force_feedback_main_init, 1);

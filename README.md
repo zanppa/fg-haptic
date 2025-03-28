@@ -15,21 +15,21 @@ Description
 
 This force feedback support consists of 4 components:
 - fg-haptic or fg-haptic.exe
-- force-feedback.xml
-- force_feedback.nas
-- ff-protocol.xml
+- gui/dialogs/force-feedback.xml and force-feedback-aircraft.xml
+- Nasal/force_feedback.nas
+- Protocol/ff-protocol.xml
 
 fg-haptic or fg-haptic.exe is the main program, which
 supports force feedback devices through SDL 2 library.
 
-force-feedback.xml is a configuration dialog which resides
-inside Flight Gear's data directory.
+force-feedback.xml and force-feedback-aircraft.xml are configuration 
+dialogs to modify force feedback device settings and aircraft effects setup.
 
-force_feedback.nas is a wrapper between different flight
-dynamics models etc. and the force feedback effects.
+force_feedback.nas calculates all the effect forces based on the 
+flight dynamiocs models etc.
 
 ff-protocol.xml is a generic IO protocol which fg-haptic
-uses to communicate with flight Gear.
+uses to communicate with Flight Gear.
 
 This program has been tested with following devices:
 
@@ -73,24 +73,54 @@ For windows, you might need to set EXE=.exe also, i.e.:
 
 
 
-Installation
-------------
+Prerequirements
+---------------
 
-fg-haptic(.exe) can reside anywhere on your system.
+SDL2 and SDL2-net runtimes must be available for fg-haptic to work.
 
 Linux: Install `libsdl2` and `libsdl2-net`.
 
-Windows: Install [SDL2 runtime](https://www.libsdl.org/download-2.0.php) and [SDL2_net runtime](https://www.libsdl.org/projects/SDL_net/) dlls to the same directory as fg-haptic.exe.
+Windows: Install [SDL2 runtime](https://github.com/libsdl-org/SDL/releases) (search for 2.x.y version) or [SDL2 compat](https://github.com/libsdl-org/sdl2-compat/releases) with SDL3.dll and [SDL2_net runtime](https://github.com/libsdl-org/SDL_net/releases) dlls to the same directory as fg-haptic.exe.
 
-force-feedback.xml must be copied into **gui/dialogs/** directory
+
+
+Installation
+------------
+
+fg-haptic is now packaged as an add-on. This means that installation should be rather 
+straightforward without needing to copy (many) files around.
+
+Clone the repository or donwload it as a zip file an unzip it to some location. If necessary (Linux), 
+build the program.
+
+In FlightGear's launcher, select Add-ons and add the location where you put the files as an add-on. 
+
+Optionally, add following command line option to FlightGear:
+
+    --addon=/path/to/fg-haptic
+
+Note! Since FG addons do not yet support protocol file a manual copy must still be done:
+
+Protocol/ff-protocol.xml must be copied into **Protocol/** directory
 inside Flight Gear's data directory.
 
-force_feedback.nas must be copied into **Nasal/** directory
+
+
+Manual installation
+-------------------
+
+fg-haptic(.exe) can reside anywhere on your system.
+
+gui/dialogs/force-feedback.xml and force-feedback-aircraft.xml must be copied into **gui/dialogs/** directory
 inside Flight Gear's data directory.
 
-ff-protocol.xml must be copied into **Protocol/** directory
+Nasal/force_feedback.nas must be copied into **Nasal/** directory
 inside Flight Gear's data directory.
 
+Protocol/ff-protocol.xml must be copied into **Protocol/** directory
+inside Flight Gear's data directory.
+
+Note that after manual installation, the ```--addon``` command line argument is not needed.
 
 
 Running
@@ -98,7 +128,7 @@ Running
 
 Launch flightgear with at least the following options:
 
-    fgfs --telnet=5401 --generic=socket,out,20,localhost,5402,udp,ff-protocol
+    fgfs --telnet=5401 --generic=socket,out,20,localhost,5402,udp,ff-protocol --addon=/path/to/fg-haptic
 
 Then run ```fg-haptic(.exe)```.
 
