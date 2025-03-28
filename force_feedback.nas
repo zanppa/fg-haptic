@@ -220,7 +220,7 @@ var update_ground_rumble = func(path) {
   if(getprop("/gear/gear/wow")) {
     var groundspeed = getprop("/velocities/groundspeed-kt");
     if(groundspeed > 3.0 )
-      period = 15000.0 / groundspeed;
+      period = 40000.0 / groundspeed;
   }
 
   var period_node = rumble_path.getNode("period");
