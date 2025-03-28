@@ -48,7 +48,8 @@
 #define EFFECTS		9
 
 
-#define MODE_NORMAL		0
+#define MODE_OFF	-1
+#define MODE_NORMAL	0
 #define MODE_ALTERNATE	1
 const char axes[AXES] = { 'x', 'y', 'z' };
 
@@ -111,14 +112,13 @@ typedef struct __hapticdevice {
 	float shaker_gain;
 	float rumble_gain;
 
-	unsigned char rumble_mode;
-	unsigned char stick_mode;
+	signed char rumble_mode;
+	signed char stick_mode;
 
-	// TODO: Possibility to invert axes
 	signed char pilot_axes[AXES];	// Axes mapping, -1 = not used
 	signed char stick_axes[AXES];
 
-	signed char pilot_invert[AXES];
+	signed char pilot_invert[AXES];	// 1 = non-inverted, -1 = inverted
 	signed char stick_invert[AXES];
 
 	unsigned int last_rumble;
@@ -319,13 +319,16 @@ void read_devices(void)
 	printf("Reading device setup from FG\n");
 
 	for (int i = 0; i < num_devices; i++) {
+		printf("  Device %d\n", i);
 		// Constant device settings
 		fgfswrite(telnet_sock, "get /haptic/device[%d]/low-pass-filter", i);
 		p = fgfsread(telnet_sock, READ_TIMEOUT);
 		if (p) {
 			read = sscanf(p, "%f", &fdata);
-			if (read == 1)
+			if (read == 1) {
 				devices[i].lowpass = fdata;
+				printf("    LP filter %f\n", fdata);
+			}
 		}
 
 		if (devices[i].supported & SDL_HAPTIC_GAIN) {
@@ -333,8 +336,10 @@ void read_devices(void)
 			p = fgfsread(telnet_sock, READ_TIMEOUT);
 			if (p) {
 				read = sscanf(p, "%f", &fdata);
-				if (read == 1)
+				if (read == 1) {
 					devices[i].gain = fdata;
+					printf("    Gain %f\n", fdata);
+				}
 			}
 		}
 
@@ -343,8 +348,10 @@ void read_devices(void)
 			p = fgfsread(telnet_sock, READ_TIMEOUT);
 			if (p) {
 				read = sscanf(p, "%f", &fdata);
-				if (read == 1)
+				if (read == 1) {
 					devices[i].autocenter = fdata;
+					printf("    Autocenter %f\n", fdata);
+				}
 			}
 		}
 		// Constant force -> pilot G forces and aileron loading
@@ -354,37 +361,47 @@ void read_devices(void)
 			p = fgfsread(telnet_sock, READ_TIMEOUT);
 			if (p) {
 				read = sscanf(p, "%f", &fdata);
-				if (read == 1)
+				if (read == 1) {
 					devices[i].pilot_gain = fdata;
+					printf("    Pilot gain %f\n", fdata);
+				}
 			}
 			fgfswrite(telnet_sock, "get /haptic/device[%d]/stick-force/gain", i);
 			p = fgfsread(telnet_sock, READ_TIMEOUT);
 			if (p) {
 				read = sscanf(p, "%f", &fdata);
-				if (read == 1)
+				if (read == 1) {
 					devices[i].stick_gain = fdata;
+					printf("    Stick force gain %f\n", fdata);
+				}
 			}
 			fgfswrite(telnet_sock, "get /haptic/device[%d]/stick-force/mode", i);
 			p = fgfsread(telnet_sock, READ_TIMEOUT);
 			if (p) {
 				read = sscanf(p, "%d", &idata);
-				if (read == 1)
+				if (read == 1) {
 					devices[i].stick_mode = idata;
+					printf("    Stick force mode %d\n", idata);
+				}
 			}
 
 			fgfswrite(telnet_sock, "get /haptic/device[%d]/ground-rumble/gain", i);
 			p = fgfsread(telnet_sock, READ_TIMEOUT);
 			if (p) {
 				read = sscanf(p, "%f", &fdata);
-				if (read == 1)
+				if (read == 1) {
 					devices[i].rumble_gain = fdata;
+					printf("    Ground rumble gain %f\n", fdata);
+				}
 			}
 			fgfswrite(telnet_sock, "get /haptic/device[%d]/ground-rumble/mode", i);
 			p = fgfsread(telnet_sock, READ_TIMEOUT);
 			if (p) {
 				read = sscanf(p, "%d", &idata);
-				if (read == 1)
+				if (read == 1) {
 					devices[i].rumble_mode = idata;
+					printf("    Ground rumble mode %d\n", idata);
+				}
 			}
 
 			for (int x = 0; x < devices[i].axes && x < AXES; x++) {
@@ -397,10 +414,10 @@ void read_devices(void)
 							devices[i].pilot_invert[x] = -1;
 							idata = idata % AXES;
 						} else devices[i].pilot_invert[x] = 1;
-						devices[i].pilot_axes[x] = idata;
 
+						devices[i].pilot_axes[x] = idata;
 					}
-					printf("Pilot force axis %c: %c\n", axes[x], axes[devices[i].pilot_axes[x]]);
+					printf("Pilot force axis (joystick) %c: (sim) %c %s\n", axes[x], axes[devices[i].pilot_axes[x]], devices[i].pilot_invert[x]>0?"":"inv");
 				}
 
 				fgfswrite(telnet_sock, "get /haptic/device[%d]/stick-force/%c", i, axes[x]);
@@ -414,7 +431,7 @@ void read_devices(void)
 						} else devices[i].stick_invert[x] = 1;
 						devices[i].stick_axes[x] = idata;
 					}
-					printf("Stick force axis %c: %c\n", axes[x], axes[devices[i].stick_axes[x]]);
+					printf("Stick force axis (joystick) %c: (sim) %c %s\n", axes[x], axes[devices[i].stick_axes[x]], devices[i].stick_invert[x]>0?"":"inv");
 				}
 			}
 		}
@@ -448,7 +465,7 @@ void read_devices(void)
 	idata = 1;
 	while(idata && retries < 20) {
 		fgfswrite(telnet_sock, "set /haptic/reconfigure 0");
-		printf("Waiting for the command to go through...\n");
+		printf("Marking reconfiguration done...\n");
 		int reads = 0;
 		do {
 			reads++;
@@ -635,7 +652,7 @@ void reload_effect(hapticDevice * device, SDL_HapticEffect * effect, int *effect
 	if (SDL_HapticUpdateEffect(device->device, *effectId, effect) < 0)
 		printf("Update error: %s\n", SDL_GetError());
 	if (run) {
-		printf("Running effect %d\n", *effectId);
+		//printf("Running effect %d\n", *effectId);
 		if (SDL_HapticRunEffect(device->device, *effectId, 1) < 0)
 			printf("Run error: %s\n", SDL_GetError());
 	}
@@ -674,8 +691,16 @@ void read_fg_generic(void)
 		printf("Error reading generic I/O!\n");
 		return;
 	}
-	// printf("%s\n", p);
+	//printf("%s\n", p);
 	// printf("%d\n", reconf);
+
+/*
+	printf("%d|%f|%f|%f|%f|%f|%f|%f|%f|%f|%d|%f\n", reconf,
+		      params.pilot[0], params.pilot[1], params.pilot[2],
+		      params.stick[0], params.stick[1], params.stick[2],
+		      params.trim[0], params.trim[1], params.trim[2],
+		      params.shaker_trigger, params.rumble_period);
+*/
 
 	memcpy(&new_params, &params, sizeof(effectParams));
 
@@ -1035,7 +1060,7 @@ int main(int argc, char **argv)
 					    (signed short)clamp(devices[i].params.z, -32760.0, 32760.0);
 					reload_effect(&devices[i], &devices[i].effect[CONST_Z], &devices[i].effectId[CONST_Z], start_effects);
 				}
-				// printf("dt: %d  X: %.6f  Y: %.6f\n", (unsigned int)dt, devices[i].params.x, devices[i].params.y);
+				//printf("dt: %d  X: %.6f  Y: %.6f\n", (unsigned int)dt, devices[i].params.x, devices[i].params.y);
 			}
 
 			// Spring effect if stick forces in normal mode
@@ -1062,6 +1087,7 @@ int main(int argc, char **argv)
 				}
 
 				reload_effect(&devices[i], &devices[i].effect[SPRING], &devices[i].effectId[SPRING], start_effects);
+				//printf("dt: %d  X: %.6f  Y: %.6f\n", (unsigned int)dt,  devices[i].params.coeff[0], devices[i].params.coeff[1]);
 			}
 
 
