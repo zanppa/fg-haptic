@@ -686,7 +686,7 @@ void create_effects(void)
 			printf("\tConstant force Z\n");
 		}
 
-		// Friction effect, force opposing velocity, currently constant gain for all axis
+		// Friction effect, force opposing stick movement (static friction), currently constant gain for all axis
 		if (devices[i].supported & SDL_HAPTIC_FRICTION && devices[i].friction > 0.001) {
 			printf("\tFriction effect\n");
 			devices[i].effect[FRICTION].type = SDL_HAPTIC_FRICTION;
@@ -708,7 +708,7 @@ void create_effects(void)
 			}
 		}
 
-		// Daping effect, force opposing acceleration, constant gain in all axis
+		// Damping effect, force opposing stick velocity (higher velocity -> more force needed), constant gain in all axis
 		if (devices[i].supported & SDL_HAPTIC_DAMPER && devices[i].damping > 0.001) {
 			printf("\tDamping effect\n");
 			devices[i].effect[DAMPING].type = SDL_HAPTIC_DAMPER;
