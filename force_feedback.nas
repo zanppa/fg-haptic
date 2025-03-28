@@ -430,37 +430,37 @@ var load_config_file = func(filename = "default", notice = 1) {
   }
 
   # Update aircraft setup if in config
-  var ac_setup = config.getValue("aircraft-setup");
+  var ac_setup = config.getNode("aircraft-setup");
   if(ac_setup != nil) {
-    value = ac_setup.getValue("aircraft-setup/aileron-max-deflection-deg");
+    value = ac_setup.getValue("aileron-max-deflection-deg");
     if(value != nil) hapticNode.setValue("aircraft-setup/aileron-max-deflection-deg", value);
-    value = ac_setup.getValue("aircraft-setup/elevator-max-deflection-deg");
+    value = ac_setup.getValue("elevator-max-deflection-deg");
     if(value != nil) hapticNode.setValue("aircraft-setup/elevator-max-deflection-deg", value);
-    value = ac_setup.getValue("aircraft-setup/rudder-max-deflection-deg");
+    value = ac_setup.getValue("rudder-max-deflection-deg");
     if(value != nil) hapticNode.setValue("aircraft-setup/rudder-max-deflection-deg", value);
 
-    value = ac_setup.getValue("aircraft-setup/aileron-gain");
+    value = ac_setup.getValue("aileron-gain");
     if(value != nil) hapticNode.setValue("aircraft-setup/aileron-gain", value);
-    value = ac_setup.getValue("aircraft-setup/elevator-gain");
+    value = ac_setup.getValue("elevator-gain");
     if(value != nil) hapticNode.setValue("aircraft-setup/elevator-gain", value);
-    value = ac_setup.getValue("aircraft-setup/rudder-gain");
+    value = ac_setup.getValue("rudder-gain");
     if(value != nil) hapticNode.setValue("aircraft-setup/rudder-gain", value);
-    value = ac_setup.getValue("aircraft-setup/g-force-gain");
+    value = ac_setup.getValue("g-force-gain");
     if(value != nil) hapticNode.setValue("aircraft-setup/g-force-gain", value);
-    value = ac_setup.getValue("aircraft-setup/slip-gain");
+    value = ac_setup.getValue("slip-gain");
     if(value != nil) hapticNode.setValue("aircraft-setup/slip-gain", value);
 
-    value = ac_setup.getValue("aircraft-setup/stall-AoA");
+    value = ac_setup.getValue("stall-AoA");
     if(value != nil) hapticNode.setValue("aircraft-setup/stall-AoA", value);
-    value = ac_setup.getValue("aircraft-setup/pusher-start-AoA");
+    value = ac_setup.getValue("pusher-start-AoA");
     if(value != nil) hapticNode.setValue("aircraft-setup/pusher-start-AoA", value);
-    value = ac_setup.getValue("aircraft-setup/pusher-working-angle-deg");
+    value = ac_setup.getValue("pusher-working-angle-deg");
     if(value != nil) hapticNode.setValue("aircraft-setup/pusher-working-angle-deg", value);
-    value = ac_setup.getValue("aircraft-setup/wing-shadow-AoA");
+    value = ac_setup.getValue("wing-shadow-AoA");
     if(value != nil) hapticNode.setValue("aircraft-setup/wing-shadow-AoA", value);
-    value = ac_setup.getValue("aircraft-setup/wing-shadow-angle-deg");
+    value = ac_setup.getValue("wing-shadow-angle-deg");
     if(value != nil) hapticNode.setValue("aircraft-setup/wing-shadow-angle-deg", value);
-    value = ac_setup.getValue("aircraft-setup/stick-shaker-AoA");
+    value = ac_setup.getValue("stick-shaker-AoA");
     if(value != nil) hapticNode.setValue("aircraft-setup/stick-shaker-AoA", value);
 
     # Apply the variables
