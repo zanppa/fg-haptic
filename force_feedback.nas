@@ -174,7 +174,7 @@ var update_stick_forces = func(path) {
     var axis_x = stick_force_path.getNode("trim-aileron", 1);
     if(axis_x != nil) axis_x.setValue(aileron_trim_prop.getValue());
     var axis_y = stick_force_path.getNode("trim-elevator", 1);
-    if(axis_y != nil) axis_y.setValue(elevator_trim_prop.getValue());
+    if(axis_y != nil) axis_y.setValue(-elevator_trim_prop.getValue());  # Needs to be inverted
     var axis_z = stick_force_path.getNode("trim-rudder", 1);
     if(axis_z != nil) axis_z.setValue(rudder_trim_prop.getValue());
   }
@@ -352,12 +352,12 @@ var load_config_file = func(filename = "default", notice = 1) {
   }
 
   # Set global properties according to saved file
-  value = config.getValue("force-trim-aileron");
-  if(value != nil) hapticNode.setValue("force-trim-aileron", value);
-  value = config.getValue("force-trim-elevator");
-  if(value != nil) hapticNode.setValue("force-trim-elevator", value);
-  value = config.getValue("force-trim-rudder");
-  if(value != nil) hapticNode.setValue("force-trim-rudder", value);
+  value = config.getValue("enable-force-trim-aileron");
+  if(value != nil) hapticNode.setValue("enable-force-trim-aileron", value);
+  value = config.getValue("enable-force-trim-elevator");
+  if(value != nil) hapticNode.setValue("enable-force-trim-elevator", value);
+  value = config.getValue("enable-force-trim-rudder");
+  if(value != nil) hapticNode.setValue("enable-force-trim-rudder", value);
 
   # Update device parameters if matching device is found
   var devices = hapticNode.getChildren("device");
@@ -568,9 +568,9 @@ _setlistener("/sim/signals/nasal-dir-initialized", func {
   aileron_trim_prop = props.globals.initNode("/haptic/force-trim-aileron", 0.0, "DOUBLE");
   elevator_trim_prop = props.globals.initNode("/haptic/force-trim-elevator", 0.0, "DOUBLE");
   rudder_trim_prop = props.globals.initNode("/haptic/force-trim-rudder", 0.0, "DOUBLE");
-  props.globals.initNode("/haptic/stick-force/trim-aileron", 0.0, "DOUBLE");
-  props.globals.initNode("/haptic/stick-force/trim-elevator", 0.0, "DOUBLE");
-  props.globals.initNode("/haptic/stick-force/trim-rudder", 0.0, "DOUBLE");
+  props.globals.initNode("/haptic/stick-force/trim-aileron", 0.0, "DOUBLE"); # Used when stick is in normal mode only
+  props.globals.initNode("/haptic/stick-force/trim-elevator", 0.0, "DOUBLE"); # --"--
+  props.globals.initNode("/haptic/stick-force/trim-rudder", 0.0, "DOUBLE");	# --"--
 
   props.globals.initNode("/haptic/stick-force/gain", 0.0, "DOUBLE");
   props.globals.initNode("/haptic/stick-force/mode", 0, "INT");
