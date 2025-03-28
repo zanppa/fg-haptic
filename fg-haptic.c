@@ -1171,7 +1171,7 @@ int main(int argc, char **argv)
 					devices[i].effect[SPRING].condition.center[ax] = (signed short)clamp(new_params.trim[j]*32767, -32760, 32760);
 
 					// Calculate the new coefficient
-					devices[i].params.coeff[ax] = -new_params.stick[j] * devices[i].stick_gain * devices[i].stick_invert[j];
+					devices[i].params.coeff[ax] = new_params.stick[j] * devices[i].stick_gain * devices[i].stick_invert[j];
 
 					// Apply low pass filter
 					devices[i].params.coeff[ax] = devices[i].params.coeff[ax] * g1 + oldParams[i].coeff[ax] * g2;

@@ -120,14 +120,12 @@ var update_stick_forces = func(path) {
     elevator_angle = elevator_angle + AoA;
     rudder_angle = rudder_angle - slip_angle;
 
-    # Invert all forces here by default, so selecting "X" or "Y" should give correct result
-
-    aileron_force = -aileron_force * math.sin(aileron_angle) * slip_gain;
+    aileron_force = aileron_force * math.sin(aileron_angle) * slip_gain;
   
     elevator_force = elevator_force * math.sin(elevator_angle) * slip_gain;
-    elevator_force = -elevator_force + g_force_gain * g_force;
+    elevator_force = elevator_force + g_force_gain * g_force;
 
-    rudder_force = -rudder_force * math.sin(rudder_angle);
+    rudder_force = rudder_force * math.sin(rudder_angle);
   } else {
     # Normal mode using spring effect
     # Spring force is basically just the base force, i.e. airspeed squared
