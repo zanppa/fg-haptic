@@ -1,0 +1,340 @@
+<?xml version="1.0"?>
+
+<PropertyList>
+  <name>force-feedback-aircraft</name>
+  <dialog-name>force-feedback-aircraft</dialog-name>
+
+  <!-- <padding>20</padding> -->
+  <layout>vbox</layout>
+
+  <!-- Dialog header -->
+  <group>
+    <layout>hbox</layout>
+    <empty><stretch>1</stretch></empty>
+
+    <text>
+      <label>Force-feedback aircraft setup</label>
+    </text>
+
+    <empty><stretch>1</stretch></empty>
+
+    <!-- Close button -->
+    <button>
+      <pref-width>16</pref-width>
+      <pref-height>16</pref-height>
+      <legend></legend>
+      <keynum>27</keynum>
+      <border>2</border>
+      <binding>
+        <command>dialog-close</command>
+      </binding>
+    </button>
+  </group>
+
+  <hrule><stretch>1</stretch></hrule>
+
+  <group>
+    <name>aileron-prop-gain</name>
+    <layout>hbox</layout>
+    <text><label>Aileron gain</label></text>
+    <slider>
+      <name>aileron-gain</name>
+      <property>/haptic/aircraft-setup/aileron-gain</property>
+      <min>0</min>
+      <max>10</max>
+      <step>0.01</step>
+      <binding>
+        <command>dialog-apply</command>
+      </binding>
+      <live>true</live>
+    </slider>
+    <text>
+      <label>0.00</label>
+      <property>/haptic/aircraft-setup/aileron-gain</property>
+      <format>%-0.2f</format>
+      <live>true</live>
+    </text>
+  </group>
+  <group>
+    <name>aileron-prop-defl</name>
+    <layout>hbox</layout>
+    <text><label>Aileron max deflection</label></text>
+    <slider>
+      <name>aileron-max-defl</name>
+      <property>/haptic/aircraft-setup/aileron-max-deflection</property>
+      <min>0</min>
+      <max>90</max>
+      <step>0.1</step>
+      <binding>
+        <command>dialog-apply</command>
+      </binding>
+      <live>true</live>
+    </slider>
+    <text>
+      <label>0.00</label>
+      <property>/haptic/aircraft-setup/aileron-max-deflection-deg</property>
+      <format>%-0.1f</format>
+      <live>true</live>
+    </text>
+  </group>
+  <group>
+    <name>elevator-prop-gain</name>
+    <layout>hbox</layout>
+    <text><label>Elevator gain</label></text>
+    <slider>
+      <name>elevator-gain</name>
+      <property>/haptic/aircraft-setup/elevator-gain</property>
+      <min>0</min>
+      <max>10</max>
+      <step>0.01</step>
+      <binding>
+        <command>dialog-apply</command>
+      </binding>
+      <live>true</live>
+    </slider>
+    <text>
+      <label>0.00</label>
+      <property>/haptic/aircraft-setup/elevator-gain</property>
+      <format>%-0.2f</format>
+      <live>true</live>
+    </text>
+  </group>
+  <group>
+    <name>elevator-prop-defl</name>
+    <layout>hbox</layout>
+    <text><label>Elevator max deflection</label></text>
+    <slider>
+      <name>elevator-max-defl</name>
+      <property>/haptic/aircraft-setup/elevator-max-deflection-deg</property>
+      <min>0</min>
+      <max>90</max>
+      <step>0.1</step>
+      <binding>
+        <command>dialog-apply</command>
+      </binding>
+      <live>true</live>
+    </slider>
+    <text>
+      <label>0.00</label>
+      <property>/haptic/aircraft-setup/elevator-max-deflection-deg</property>
+      <format>%-0.1f</format>
+      <live>true</live>
+    </text>
+  </group>
+  <group>
+    <name>elevator-prop-gforce</name>
+    <layout>hbox</layout>
+    <text><label>Elevator g-force gain</label></text>
+    <slider>
+      <name>elevator-gf-gain</name>
+      <property>/haptic/aircraft-setup/g-force-gain</property>
+      <min>0</min>
+      <max>1</max>
+      <step>0.001</step>
+      <binding>
+        <command>dialog-apply</command>
+      </binding>
+      <live>true</live>
+    </slider>
+    <text>
+      <label>0.000</label>
+      <property>/haptic/aircraft-setup/g-force-gain</property>
+      <format>%-0.3f</format>
+      <live>true</live>
+    </text>
+  </group>
+  <group>
+    <name>rudder-prop-gain</name>
+    <layout>hbox</layout>
+    <text><label>Rudder gain</label></text>
+    <slider>
+      <name>rudder-gain</name>
+      <property>/haptic/aircraft-setup/rudder-gain</property>
+      <min>0</min>
+      <max>10</max>
+      <step>0.01</step>
+      <binding>
+        <command>dialog-apply</command>
+      </binding>
+      <live>true</live>
+    </slider>
+    <text>
+      <label>0.00</label>
+      <property>/haptic/aircraft-setup/rudder-gain</property>
+      <format>%-0.2f</format>
+      <live>true</live>
+    </text>
+  </group>
+  <group>
+    <name>rudder-prop-defl</name>
+    <layout>hbox</layout>
+    <text><label>Rudder max deflection</label></text>
+    <slider>
+      <name>rudder-max-defl</name>
+      <property>/haptic/aircraft-setup/rudder-max-deflection-deg</property>
+      <min>0</min>
+      <max>90</max>
+      <step>0.1</step>
+      <binding>
+        <command>dialog-apply</command>
+      </binding>
+      <live>true</live>
+    </slider>
+    <text>
+      <label>0.00</label>
+      <property>/haptic/aircraft-setup/rudder-max-deflection-deg</property>
+      <format>%-0.1f</format>
+      <live>true</live>
+    </text>
+  </group>
+
+  <group>
+    <name>stall-prop</name>
+    <layout>hbox</layout>
+    <text><label>Stall AoA</label></text>
+    <slider>
+      <name>stall-aoa</name>
+      <property>/haptic/aircraft-setup/stall-AoA</property>
+      <min>0</min>
+      <max>90</max>
+      <step>0.1</step>
+      <binding>
+        <command>dialog-apply</command>
+      </binding>
+      <live>true</live>
+    </slider>
+    <text>
+      <label>0.00</label>
+      <property>/haptic/aircraft-setup/stall-AoA</property>
+      <format>%-0.1f</format>
+      <live>true</live>
+    </text>
+  </group>
+
+  <group>
+    <name>shadow-aoa-prop</name>
+    <layout>hbox</layout>
+    <text><label>Wing shadow AoA</label></text>
+    <slider>
+      <name>shadow-aoa</name>
+      <property>/haptic/aircraft-setup/wing-shadow-AoA</property>
+      <min>0</min>
+      <max>180</max>
+      <step>1</step>
+      <binding>
+        <command>dialog-apply</command>
+      </binding>
+      <live>true</live>
+    </slider>
+    <text>
+      <label>0.00</label>
+      <property>/haptic/aircraft-setup/wing-shadow-AoA</property>
+      <format>%-0.0f</format>
+      <live>true</live>
+    </text>
+  </group>
+  <group>
+    <name>shadow-angle-prop</name>
+    <layout>hbox</layout>
+    <text><label>Wing shadow angle</label></text>
+    <slider>
+      <name>shadow-angle</name>
+      <property>/haptic/aircraft-setup/wing-shadow-angle-deg</property>
+      <min>0</min>
+      <max>90</max>
+      <step>1</step>
+      <binding>
+        <command>dialog-apply</command>
+      </binding>
+      <live>true</live>
+    </slider>
+    <text>
+      <label>0.00</label>
+      <property>/haptic/aircraft-setup/wing-shadow-angle-deg</property>
+      <format>%-0.0f</format>
+      <live>true</live>
+    </text>
+  </group>
+
+
+  <group>
+    <name>shaker-aoa-prop</name>
+    <layout>hbox</layout>
+    <text><label>Stick shaker AoA</label></text>
+    <slider>
+      <name>stick-shaker-aoa</name>
+      <property>/haptic/aircraft-setup/stick-shaker-AoA</property>
+      <min>0</min>
+      <max>90</max>
+      <step>0.1</step>
+      <binding>
+        <command>dialog-apply</command>
+      </binding>
+      <live>true</live>
+    </slider>
+    <text>
+      <label>0.00</label>
+      <property>/haptic/aircraft-setup/stick-shaker-AoA</property>
+      <format>%-0.1f</format>
+      <live>true</live>
+    </text>
+  </group>
+  <group>
+    <name>shaker-speed-prop</name>
+    <layout>hbox</layout>
+    <text><label>Stick shaker speed limit</label></text>
+    <slider>
+      <name>stick-shaker-aoa</name>
+      <property>/haptic/aircraft-setup/stick-shaker-airspeed</property>
+      <min>0</min>
+      <max>200</max>
+      <step>1</step>
+      <binding>
+        <command>dialog-apply</command>
+      </binding>
+      <live>true</live>
+    </slider>
+    <text>
+      <label>0.00</label>
+      <property>/haptic/aircraft-setup/stick-shaker-airspeed</property>
+      <format>%-0.0f</format>
+      <live>true</live>
+    </text>
+  </group>
+
+
+  <group>
+    <name>buttons</name>
+    <layout>hbox</layout>
+
+    <empty><stretch>1</stretch></empty>
+
+    <!-- Apply button -->
+    <button>
+      <legend>Apply</legend>
+      <binding>
+        <command>nasal</command>
+        <script>force_feedback.update_aircraft_setup();</script>
+      </binding>
+    </button>
+
+    <!-- Save button -->
+    <button>
+      <legend>Save aircraft</legend>
+      <binding>
+        <command>nasal</command>
+        <script>force_feedback.save_config_aircraft();</script>
+      </binding>
+    </button>
+
+    <!-- Close button -->
+    <button>
+      <legend>Close</legend>
+      <binding>
+        <command>dialog-close</command>
+      </binding>
+    </button>
+  </group>
+
+
+</PropertyList>
