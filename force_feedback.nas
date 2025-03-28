@@ -20,6 +20,7 @@ var pusher_working_angle = 900.0*0.01745329; # Rad
 var wing_shadow_AoA = 900.0*0.01745329; # Rad
 var wing_shadow_angle = 900.0*0.01745329; # rad
 var stick_shaker_AoA = 17.0*0.01745329; # rad
+var stick_shaker_airspeed = 10.0;
 
 var enable_force_trim_aileron = nil;
 var enable_force_trim_elevator = nil;
@@ -197,9 +198,9 @@ var update_stick_forces = func(path) {
   var axis_z = stick_force_path.getNode("rudder", 1);
   if(axis_z != nil) axis_z.setValue(rudder_force);
 
-
-  # Stick shaker
-  if(AoA > stick_shaker_AoA)
+  
+  # Stick shaker, only if airspeed is > 10 knots or other predefined value
+  if(AoA > stick_shaker_AoA and airspeed > stick_shaker_airspeed)
   {
     setprop("/haptic/stick-shaker/trigger", 1);
   } else {
@@ -519,6 +520,7 @@ var update_aircraft_setup = func {
   wing_shadow_AoA = getprop("/haptic/aircraft-setup/wing-shadow-AoA")*0.01745329;
   wing_shadow_angle = getprop("/haptic/aircraft-setup/wing-shadow-angle-deg")*0.01745329;
   stick_shaker_AoA = getprop("/haptic/aircraft-setup/stick-shaker-AoA")*0.01745329;
+  stick_shaker_airspeed = getprop("/haptic/aircraft-setup/stick-shaker-airspeed");
 };
 
 # Read aircraft properties when fdm is ready
@@ -544,6 +546,7 @@ var init_aircraft_setup = func() {
   props.globals.initNode("/haptic/aircraft-setup/wing-shadow-AoA", wing_shadow_AoA/0.01745329, "DOUBLE");
   props.globals.initNode("/haptic/aircraft-setup/wing-shadow-angle-deg", wing_shadow_angle/0.01745329, "DOUBLE");
   props.globals.initNode("/haptic/aircraft-setup/stick-shaker-AoA", stick_shaker_AoA/0.01745329, "DOUBLE");
+  props.globals.initNode("/haptic/aircraft-setup/stick-shaker-airspeed", stick_shaker_airspeed, "DOUBLE");
 };
 
 ###
