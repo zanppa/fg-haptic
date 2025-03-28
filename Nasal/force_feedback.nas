@@ -630,6 +630,10 @@ var force_feedback_main_init = func() {
   # Reload menu so the new item will appear
   fgcommand("reinit", props.Node.new({subsystem:"gui"}));
 
+  # Enable/load generic io and telnet protocols
+  fgcommand("add-io-channel", {"config":"telnet,5401", "name":"force-feedback-config"});
+  fgcommand("add-io-channel", {"config":"generic,socket,out,20,localhost,5402,udp,ff-protocol", "name":"force-feedback-channel"});
+
   # Set timer for main loop
   #settimer(update_forces, update_interval);
   if(haptic_update_timer == nil) {

@@ -126,9 +126,13 @@ Note that after manual installation, the ```--addon``` command line argument is 
 Running
 -------
 
-Launch flightgear with at least the following options:
+Launch flightgear with the addon enabled:
 
-    fgfs --telnet=5401 --generic=socket,out,20,localhost,5402,udp,ff-protocol --addon=/path/to/fg-haptic
+    fgfs --addon=/path/to/fg-haptic
+
+This now automatically starts the telnet and generic protocols for communication. 
+For manual installation, it should be enough to just normally launch Flight Gear without 
+any additional arguments.
 
 Then run ```fg-haptic(.exe)```.
 
@@ -141,6 +145,12 @@ fg-haptic expects telnet to be at port 5401 and receives generic IO on port
 fg-haptic now uses UDP so fg-haptic can be launched/restarted while Flight Gear
 is running.
 
+Previously one needed to enable the protocols separately using following command line 
+which is here for reference:
+
+    fgfs --telnet=5401 --generic=socket,out,20,localhost,5402,udp,ff-protocol
+
+
 If FlightGear's menu is not visible, press F10 to display it.
 In the Help menu you can find Force feedback options.
 Tune them to your liking and fly!
@@ -151,6 +161,7 @@ To test force feedback effects, run
 
 which tests all effects on all connected joysticks. There is also a simple test
 implemented in the dialog inside Flight Gear.
+
 
 Effects
 -------
