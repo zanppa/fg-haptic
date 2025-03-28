@@ -29,9 +29,6 @@
 
 #define NAMELEN		30
 
-// Currently supported effects:
-// 0) Constant force = pilot G and control surface loading
-// 1) Rumble = stick shaker
 #define READ_TIMEOUT	30	// 30 secs, timeout when reading telnet data (should be long)
 #define CONN_TIMEOUT	30	// 30 seconds, timeout when connecting the telnet connection
 #define DISCONNECT_TIMEOUT	5	// After 5 seconds of no data (after valid data) consider fgfs closed (ms)
@@ -1086,7 +1083,7 @@ int main(int argc, char **argv)
 
 			// Ground rumble in normal mode
 			devices[i].params.rumble_period = new_params.rumble_period;
-			if(devices[i].effectId[GROUND_NOTCH] != -1 && devices[i].rumble_mode == MODE_NORMAL) {
+			if(devices[i].effectId[GROUND_NOTCH] != -1 && devices[i].rumble_mode == MODE_ALTERNATE) {
 				if (new_params.rumble_period > 0.00001) {
 					devices[i].effect[GROUND_NOTCH].periodic.period = new_params.rumble_period;
 					if(oldParams[i].rumble_period < 0.00001) {
@@ -1130,7 +1127,7 @@ int main(int argc, char **argv)
 
 				// Add ground rumble in alternate mode
 				float rumble = 0.0;
-				if (new_params.rumble_period > 0.00001 && devices[i].rumble_mode == MODE_ALTERNATE) {
+				if (new_params.rumble_period > 0.00001 && devices[i].rumble_mode == MODE_NORMAL) {
 					// Add the rumble to constant force every now and then
 					if ((runtime - devices[i].last_rumble) > new_params.rumble_period) {
 						rumble = devices[i].rumble_gain * 32760.0;
