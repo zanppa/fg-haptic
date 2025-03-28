@@ -70,6 +70,7 @@ static UDPpacket *fg_packet = NULL;
 typedef struct __effectParams {
 	float pilot[AXES];
 	float stick[AXES];
+	float stick_alt[AXES];
 	float trim[AXES];
 	int shaker_trigger;
 
@@ -770,13 +771,14 @@ int read_fg_generic(void)
 	memset(&params, 0, sizeof(effectParams));
 
 	// Divide the buffer into chunks
-	read = sscanf(p, "%d|%f|%f|%f|%f|%f|%f|%f|%f|%f|%d|%f", &reconf,
+	read = sscanf(p, "%d|%f|%f|%f|%f|%f|%f|%f|%f|%f|%f|%f|%f|%d|%f", &reconf,
 		      &params.pilot[0], &params.pilot[1], &params.pilot[2],
 		      &params.stick[0], &params.stick[1], &params.stick[2],
+		      &params.stick_alt[0], &params.stick_alt[1], &params.stick_alt[2],
 		      &params.trim[0], &params.trim[1], &params.trim[2],
 		      &params.shaker_trigger, &params.rumble_period);
 
-	if (read != 12) {
+	if (read != 15) {
 		printf("Error reading generic I/O!\n");
 		return -4;
 	}
@@ -1111,7 +1113,7 @@ int main(int argc, char **argv)
 					// Stick forces with axis mapping
 					for(int ax = 0; ax < AXES; ax++) {
 						if (devices[i].stick_axes[ax] >= 0 && devices[i].stick_axes[ax] < devices[i].axes)
-							devices[i].params.force.f[devices[i].stick_axes[ax]] += new_params.stick[ax] * devices[i].stick_gain * devices[i].stick_invert[ax];
+							devices[i].params.force.f[devices[i].stick_axes[ax]] += new_params.stick_alt[ax] * devices[i].stick_gain * devices[i].stick_invert[ax];
 					}
 				}
 
@@ -1233,6 +1235,10 @@ int main(int argc, char **argv)
 			// No data for a while, assume fgfs is closed and wait for new connection
 			printf("FlightGear disconnected! Waiting for reconnection...\n");
 			fgfsclose(telnet_sock);
+
+			// Stop all effects from playing
+			for(int i = 0; i < num_devices; i++)
+				SDL_HapticStopAll(devices[i].device);
 
 			while(1) {
 				fgfs_address = fgfs_wait_packet(server_sock);

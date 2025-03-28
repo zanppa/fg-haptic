@@ -63,6 +63,27 @@
      </chunk>
 
      <chunk>
+       <name>alt_stick_force_aileron</name>
+       <format>%.6f</format>
+       <type>float</type>
+       <node>/haptic/stick-force/aileron-alt</node>
+     </chunk>
+
+     <chunk>
+       <name>alt_stick_force_elevator</name>
+       <format>%.6f</format>
+       <type>float</type>
+       <node>/haptic/stick-force/elevator-alt</node>
+     </chunk>
+
+     <chunk>
+       <name>alt_stick_force_rudder</name>
+       <format>%.6f</format>
+       <type>float</type>
+       <node>/haptic/stick-force/rudder-alt</node>
+     </chunk>
+
+     <chunk>
        <name>trim_aileron</name>
        <format>%.6f</format>
        <type>float</type>
