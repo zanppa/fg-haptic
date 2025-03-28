@@ -32,9 +32,9 @@
 // Currently supported effects:
 // 0) Constant force = pilot G and control surface loading
 // 1) Rumble = stick shaker
-#define TIMEOUT		1	// 1 sec
-#define READ_TIMEOUT	5	// 5 secs
-#define CONN_TIMEOUT	30	// 30 seconds
+#define READ_TIMEOUT	30	// 30 secs, timeout when reading telnet data (should be long)
+#define CONN_TIMEOUT	30	// 30 seconds, timeout when connecting the telnet connection
+#define DISCONNECT_TIMEOUT	5	// After 5 seconds of no data (after valid data) consider fgfs closed (ms)
 #define AXES		3	// Maximum axes supported
 
 #define CONST_X		0
@@ -469,7 +469,7 @@ void read_devices(void)
 
 	int retries = 0;
 	idata = 1;
-	while(idata && retries < 20) {
+	do {
 		fgfswrite(telnet_sock, "set /haptic/reconfigure 0");
 		printf("Marking reconfiguration done...\n");
 		int reads = 0;
@@ -484,7 +484,11 @@ void read_devices(void)
 				read = 0;
 		} while(idata && reads < 30);
 		retries++;
-	}
+
+		if(!idata) break;
+
+		SDL_Delay(5000);	// Wait 5 seconds before trying again
+	} while(retries < 20);
 	printf("Done\n");
 
 	//fgfsflush(client_sock);	// Get rid of FF data that was received during reinitialization
@@ -665,7 +669,9 @@ void reload_effect(hapticDevice * device, SDL_HapticEffect * effect, int *effect
 }
 
 
-void read_fg_generic(void)
+// Read the generic UDP protocol
+// Return 0 if valid data was received, otherwise negative number
+int read_fg_generic(void)
 {
 	int reconf, read;
 	char *p;
@@ -674,15 +680,14 @@ void read_fg_generic(void)
 	if(!fg_packet)
 		fg_packet = SDLNet_AllocPacket(1024);
 	if(!fg_packet)
-		return;
+		return -2;
 
-	//p = fgfsread(client_sock, TIMEOUT);
 	if(SDLNet_UDP_Recv(server_sock, fg_packet) < 1)
-		return;	// No data received
+		return -1;	// No data received
 
 	p = (char *)fg_packet->data;
 	if (!p)
-		return;		// Null pointer, read failed
+		return -3;	// Null pointer, read failed
 
 	memset(&params, 0, sizeof(effectParams));
 
@@ -695,7 +700,7 @@ void read_fg_generic(void)
 
 	if (read != 12) {
 		printf("Error reading generic I/O!\n");
-		return;
+		return -4;
 	}
 	//printf("%s\n", p);
 	// printf("%d\n", reconf);
@@ -712,6 +717,8 @@ void read_fg_generic(void)
 
 	if (reconf)
 		reconf_request = reconf;
+
+	return 0;
 }
 
 void test_effects(void)
@@ -864,6 +871,7 @@ int main(int argc, char **argv)
 	Uint32 fgfs_address;
 	bool start_effects = true;
 	bool old_reconf = false;
+	time_t disco_timeout = 0;	// Timeout counter for disconnection
 
 
 #ifdef _WIN32
@@ -970,6 +978,7 @@ int main(int argc, char **argv)
 
 	// Main loop
 
+	disco_timeout = time(NULL);
 	while (!quit)		// Loop as long as the connection is alive
 	{
 		dt = runtime;
@@ -984,7 +993,10 @@ int main(int argc, char **argv)
 
 		// Read new parameters
 		old_reconf = reconf_request;
-		read_fg_generic();
+		if(!read_fg_generic()) {
+			// Valid data received, reset timeout
+			disco_timeout = time(NULL);
+		}
 
 		// If parameters have changed, apply them
 		for (int i = 0; i < num_devices; i++) {
@@ -1111,6 +1123,7 @@ int main(int argc, char **argv)
 			start_effects = false;
 		}
 
+		// Reconfigure the system if reconfiguration was requested
 		//printf("%d %d\n", reconf_request, old_reconf);
 		if (reconf_request && !old_reconf) {
 			if(reconf_request > 1)
@@ -1120,6 +1133,38 @@ int main(int argc, char **argv)
 			read_devices();
 			create_effects();
 			start_effects = true;
+
+			disco_timeout = time(NULL);	// Reset disconnection timeout
+		}
+
+		if((time(NULL) - disco_timeout) > DISCONNECT_TIMEOUT) {
+			// No data for a while, assume fgfs is closed and wait for new connection
+			printf("FlightGear disconnected! Waiting for reconnection...\n");
+			fgfsclose(telnet_sock);
+
+			while(1) {
+				fgfs_address = fgfs_wait_packet(server_sock);
+				if(fgfs_address) break;
+			}
+
+			printf("Got connection, sending haptic details through telnet\n");
+			printf("Host: %d.%d.%d.%d Port: %d\n", fgfs_address & 0xFF, (fgfs_address >> 8) & 0xFF,
+					(fgfs_address >> 16) & 0xFF, (fgfs_address >> 24) & 0xFF, DFLTPORT);
+
+			// Connect to flightgear using telnet
+			telnet_sock = fgfsconnect(fgfs_address, DFLTPORT);
+			if (!telnet_sock) {
+				printf("Could not connect to flightgear with telnet!\n");
+				abort_execution(-1);
+			}
+			// Switch to data mode
+			fgfswrite(telnet_sock, "data");
+
+			// send the devices to flightgear
+			send_devices();
+
+			printf("Reconnected!\n");
+			disco_timeout = time(NULL);
 		}
 
 		SDL_Delay(10);
@@ -1134,7 +1179,10 @@ int main(int argc, char **argv)
 	//fgfsclose(server_sock);
 	SDLNet_UDP_Close(server_sock);
 
-	SDLNet_FreeSocketSet(socketset);
+	if(socketset) {
+		SDLNet_FreeSocketSet(socketset);
+		socketset = NULL;
+	}
 
 	if (oldParams)
 		free(oldParams);
@@ -1174,7 +1222,10 @@ void abort_execution(int signal)
 	//fgfsclose(server_sock);
 	SDLNet_UDP_Close(server_sock);
 
-	SDLNet_FreeSocketSet(socketset);
+	if(socketset) {
+		SDLNet_FreeSocketSet(socketset);
+		socketset = NULL;
+	}
 
 	// Close haptic devices
 	for (int i = 0; i < num_devices; i++)
@@ -1268,7 +1319,7 @@ const char *fgfsread(TCPsocket sock, int timeout)
 
 	memset(buf, 0, MAXMSG);
 
-	start = clock();
+	start = time(NULL);
 	do {
 		ready = SDLNet_CheckSockets(socketset, timeout * 1000);
 		if (!ready) {
@@ -1281,7 +1332,7 @@ const char *fgfsread(TCPsocket sock, int timeout)
 		if (SDLNet_SocketReady(sock)) {
 			ready = 1;
 		}
-	} while (!ready && clock() < (start + timeout * CLOCKS_PER_SEC));
+	} while (!ready && ((time(NULL) - start) < timeout));
 
 	if (!ready) {
 		//printf("Error in fgfsread: Socket was not ready (timeout)!\n");
@@ -1359,11 +1410,11 @@ TCPsocket fgfsconnect(const Uint32 host, const Uint16 port)
 			return NULL;
 		}
 		// Wait for connection until timeout
-		start = clock();
+		start = time(NULL);
 		do {
 			SDL_Delay(50);
 			_clientsock = SDLNet_TCP_Accept(_sock);
-		} while (!_clientsock && clock() < (start + CONN_TIMEOUT * CLOCKS_PER_SEC));
+		} while (!_clientsock && ((time(NULL) - start) < CONN_TIMEOUT));
 
 		if (!_clientsock) {
 			printf("Error in fgfsconnect: Connection timeout\n");
@@ -1402,11 +1453,11 @@ Uint32 fgfs_wait_packet(UDPsocket socket)
 		return 0;
 	}
 
-	start = clock();
+	start = time(NULL);
 	do {
 		SDL_Delay(50);
 		ret = SDLNet_UDP_Recv(socket, p);
-	} while (!ret && clock() < (start + CONN_TIMEOUT * CLOCKS_PER_SEC));
+	} while (!ret && ((time(NULL) - start) < CONN_TIMEOUT));
 
 	if(!ret) {
 		printf("Timeout in fgfs_wait_packet\n");
