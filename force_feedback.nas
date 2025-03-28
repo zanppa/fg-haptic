@@ -383,6 +383,12 @@ var load_config_file = func(filename = "default", notice = 1) {
     value = old_devices[i].getValue("gain");
     if(value != nil) devices[j].setValue("gain", value);
 
+    value = old_devices[i].getValue("friction");
+    if(value != nil) devices[j].setValue("friction", value);
+
+    value = old_devices[i].getValue("damping");
+    if(value != nil) devices[j].setValue("damping", value);
+
     value = old_devices[i].getValue("low-pass-filter");
     if(value != nil) devices[j].setValue("low-pass-filter", value);
 
