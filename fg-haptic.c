@@ -1086,14 +1086,14 @@ int main(int argc, char **argv)
 			if(devices[i].effectId[GROUND_NOTCH] != -1 && devices[i].rumble_mode == MODE_ALTERNATE) {
 				if (new_params.rumble_period > 0.00001) {
 					devices[i].effect[GROUND_NOTCH].periodic.period = new_params.rumble_period;
-					if(oldParams[i].rumble_period < 0.00001) {
+					if(oldParams[i].rumble_period < 0.001) {
 						// Start the rumble effect (previously was OFF, now ON
 						reload_effect(&devices[i], &devices[i].effect[GROUND_NOTCH], &devices[i].effectId[GROUND_NOTCH], true);
 					} else {
 						// Update period on running effect
 						reload_effect(&devices[i], &devices[i].effect[GROUND_NOTCH], &devices[i].effectId[GROUND_NOTCH], false);
 					}
-				} else if(oldParams[i].rumble_period > 0.00001) {
+				} else if(oldParams[i].rumble_period > 0.001) {
 					// Stop rumble effect on liftoff (previously effect was ON, now OFF)
 					SDL_HapticStopEffect(devices[i].device, devices[i].effectId[GROUND_NOTCH]);
 				}
@@ -1127,7 +1127,7 @@ int main(int argc, char **argv)
 
 				// Add ground rumble in alternate mode
 				float rumble = 0.0;
-				if (new_params.rumble_period > 0.00001 && devices[i].rumble_mode == MODE_NORMAL) {
+				if (new_params.rumble_period > 0.001 && devices[i].rumble_mode == MODE_NORMAL) {
 					// Add the rumble to constant force every now and then
 					if ((runtime - devices[i].last_rumble) > new_params.rumble_period) {
 						rumble = devices[i].rumble_gain * 32760.0;
