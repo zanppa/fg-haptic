@@ -595,11 +595,23 @@ _setlistener("/sim/signals/nasal-dir-initialized", func {
   props.globals.initNode("/haptic/reconfigure", 2, "INT");
   
   # Add dialog to menu
-  props.globals.getNode("/sim/menubar/default/menu[9]/item[99]/enabled", 1).setBoolValue(1);
-  props.globals.getNode("/sim/menubar/default/menu[9]/item[99]/name", 1).setValue("force-feedback");
-  props.globals.getNode("/sim/menubar/default/menu[9]/item[99]/label", 1).setValue("Force feedback options");
-  props.globals.getNode("/sim/menubar/default/menu[9]/item[99]/binding/command", 1).setValue("dialog-show");
-  props.globals.getNode("/sim/menubar/default/menu[9]/item[99]/binding/dialog-name", 1).setValue("force-feedback");
+  # Append a completely new menu for force feedback/haptic
+  var menunode = props.globals.getNode("/sim/menubar/default");
+  menunode = menunode.addChild("menu", 0, 1);	# Append as new menu
+  menunode.initNode("enabled", 1, "BOOL");
+  menunode.initNode("name", "Force-feedback", "STRING");
+
+  var childnode = menunode.addChild("item", 0, 1);	# New menuitem as first item
+  childnode.initNode("enabled", 1, "BOOL");
+  childnode.initNode("name", "force-feedback", "STRING");
+  childnode.initNode("label", "Force-feedback options", "STRING");
+  childnode.initNode("binding/command", "dialog-show", "STRING");
+  childnode.initNode("binding/dialog-name", "force-feedback", "STRING");
+  #props.globals.getNode("/sim/menubar/default/menu[9]/item[99]/enabled", 1).setBoolValue(1);
+  #props.globals.getNode("/sim/menubar/default/menu[9]/item[99]/name", 1).setValue("force-feedback");
+  #props.globals.getNode("/sim/menubar/default/menu[9]/item[99]/label", 1).setValue("Force feedback options");
+  #props.globals.getNode("/sim/menubar/default/menu[9]/item[99]/binding/command", 1).setValue("dialog-show");
+  #props.globals.getNode("/sim/menubar/default/menu[9]/item[99]/binding/dialog-name", 1).setValue("force-feedback");
   #gui.menubind("Force feedback", "dialogs.force-feedback.open()");
 
   # Reload menu so the new item will appear
