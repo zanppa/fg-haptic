@@ -909,14 +909,6 @@
             # setprop("/haptic/device[" ~ i ~ "]/", getprop("/sim/gui/dialogs/force-feedback/"));
             # setprop("/haptic/device[" ~ i ~ "]/", getprop("/sim/gui/dialogs/force-feedback/"));
 
-            var mode = getprop("/sim/gui/dialogs/force-feedback/ground-rumble-mode");
-            if(mode == "Normal")
-              setprop("/haptic/device[" ~ i ~ "]/ground-rumble/mode", 0);
-            elsif(mode == "Alternate")
-              setprop("/haptic/device[" ~ i ~ "]/ground-rumble/mode", 1);
-            else
-              setprop("/haptic/device[" ~ i ~ "]/ground-rumble/mode", -1);
-
             gui.dialog_update("force-feedback");
             return;
           }

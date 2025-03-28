@@ -96,8 +96,8 @@ var update_stick_forces = func(path) {
   # 0.5 * air_density * airspeed^2 * drag_coeff (assuming 2) * Area
   var base_force = density * airspeed * airspeed;
 
-  # Slip gain, not unitu when air stream is not perpendicular to the control surfaces
-  slip_gain = 1.0 - slip_gain * math.sin(slip_angle);
+  # Slip gain, unity when air stream is perpendicular to the control surfaces (slip = 0)
+  slip_gain = 1.0 - slip_gain * math.clamp(1.0 - math.cos(slip_angle), 0.0, 1.0);
 
   # In normal mode the spring effect force gain depends only on
   # airspeed, density and surface area. Stick calculates the actual
@@ -190,10 +190,10 @@ var update_stick_forces = func(path) {
 
   # Simulator axis, mapped to joystick axis in fg-haptic executable
   var axis_x = stick_force_path.getNode("aileron", 1);
-  if(axis_x != nil) axis_x.setValue(-aileron_force);
+  if(axis_x != nil) axis_x.setValue(aileron_force);
 
   var axis_y = stick_force_path.getNode("elevator", 1);
-  if(axis_y != nil) axis_y.setValue(-elevator_force);
+  if(axis_y != nil) axis_y.setValue(elevator_force);
 
   var axis_z = stick_force_path.getNode("rudder", 1);
   if(axis_z != nil) axis_z.setValue(rudder_force);
