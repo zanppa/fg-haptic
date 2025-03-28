@@ -178,8 +178,9 @@
             <property>/sim/gui/dialogs/force-feedback/control-surface-mode</property>
             <halign>fill</halign>
             <stretch>1</stretch>
-            <value>asdl</value>
-            <value>basd</value>
+            <value>Off</value>
+            <value>Normal</value>
+            <value>Alternate</value>
             <binding>
               <command>dialog-apply</command>
 <!--              <object-name>control-surface-mode</object-name> -->
@@ -553,6 +554,7 @@
           <property>/sim/gui/dialogs/force-feedback/ground-rumble-mode</property>
           <halign>fill</halign>
           <stretch>1</stretch>
+          <value>Off</value>
           <value>Normal</value>
           <value>Alternate</value>
           <binding>
@@ -786,8 +788,10 @@
             var mode = getprop("/sim/gui/dialogs/force-feedback/control-surface-mode");
             if(mode == "Normal")
                 setprop("/haptic/device[" ~ i ~ "]/stick-force/mode", 0);
-            else
+            elsif(mode == "Alternate")
                 setprop("/haptic/device[" ~ i ~ "]/stick-force/mode", 1);
+            else
+                setprop("/haptic/device[" ~ i ~ "]/stick-force/mode", -1);
 			
             setprop("/haptic/device[" ~ i ~ "]/stick-shaker/gain", getprop("/sim/gui/dialogs/force-feedback/stick-shaker-strength"));
             setprop("/haptic/device[" ~ i ~ "]/stick-shaker/direction", getprop("/sim/gui/dialogs/force-feedback/stick-shaker-direction"));
@@ -797,8 +801,10 @@
             mode = getprop("/sim/gui/dialogs/force-feedback/ground-rumble-mode");
             if(mode == "Normal")
                 setprop("/haptic/device[" ~ i ~ "]/ground-rumble/mode", 0);
-            else
+            elsif(mode == "Alternate")
                 setprop("/haptic/device[" ~ i ~ "]/ground-rumble/mode", 1);
+            else
+                setprop("/haptic/device[" ~ i ~ "]/ground-rumble/mode", -1);
 
             # setprop("/haptic/device[" ~ i ~ "]/", getprop("/sim/gui/dialogs/force-feedback/"));
             # setprop("/haptic/device[" ~ i ~ "]/", getprop("/sim/gui/dialogs/force-feedback/"));
@@ -806,8 +812,10 @@
             var mode = getprop("/sim/gui/dialogs/force-feedback/ground-rumble-mode");
             if(mode == "Normal")
               setprop("/haptic/device[" ~ i ~ "]/ground-rumble/mode", 0);
-            else
+            elsif(mode == "Alternate")
               setprop("/haptic/device[" ~ i ~ "]/ground-rumble/mode", 1);
+            else
+              setprop("/haptic/device[" ~ i ~ "]/ground-rumble/mode", -1);
 
             gui.dialog_update("force-feedback");
             return;
@@ -901,13 +909,14 @@
         var combo = gui.findElementByName(cmdarg(), "control-surface-mode");
         if(combo != nil) {
             combo.removeChildren("value");
+            combo.addChild("value").setValue("Off");
             if(getprop("/haptic/device[" ~ dev ~ "]/stick-force/normal") == 1)
                 combo.addChild("value").setValue("Normal");
             if(getprop("/haptic/device[" ~ dev ~ "]/stick-force/alternate") == 1)
                 combo.addChild("value").setValue("Alternate");
 
           effect = getprop("/haptic/device[" ~ dev ~ "]/stick-force/mode");
-          if(effect == nil) setprop("/sim/gui/dialogs/force-feedback/control-surface-mode", "Normal");
+          if(effect == nil or effect == -1) setprop("/sim/gui/dialogs/force-feedback/control-surface-mode", "Off");
           elsif(effect == 0) setprop("/sim/gui/dialogs/force-feedback/control-surface-mode", "Normal");
           elsif(effect == 1) setprop("/sim/gui/dialogs/force-feedback/control-surface-mode", "Alternate");
         }
@@ -965,13 +974,14 @@
         var combo = gui.findElementByName(cmdarg(), "ground-rumble-mode");
         if(combo != nil) {
             combo.removeChildren("value");
+            combo.addChild("value").setValue("Off");
             if(getprop("/haptic/device[" ~ dev ~ "]/ground-rumble/normal") == 1)
                 combo.addChild("value").setValue("Normal");
             if(getprop("/haptic/device[" ~ dev ~ "]/ground-rumble/alternate") == 1)
                 combo.addChild("value").setValue("Alternate");
 
           effect = getprop("/haptic/device[" ~ dev ~ "]/ground-rumble/mode");
-          if(effect == nil) setprop("/sim/gui/dialogs/force-feedback/ground-rumble-mode", "Normal");
+          if(effect == nil or effect == -1) setprop("/sim/gui/dialogs/force-feedback/ground-rumble-mode", "Off");
           elsif(effect == 0) setprop("/sim/gui/dialogs/force-feedback/ground-rumble-mode", "Normal");
           elsif(effect == 1) setprop("/sim/gui/dialogs/force-feedback/ground-rumble-mode", "Alternate");
         }
