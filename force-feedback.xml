@@ -892,6 +892,8 @@
                 setprop("/haptic/device[" ~ i ~ "]/stick-force/mode", 1);
             else
                 setprop("/haptic/device[" ~ i ~ "]/stick-force/mode", -1);
+
+            setprop("/haptic/stick-force/mode", getprop("/haptic/device[" ~ i ~ "]/stick-force/mode")); # TODO: Hack
 			
             setprop("/haptic/device[" ~ i ~ "]/stick-shaker/gain", getprop("/sim/gui/dialogs/force-feedback/stick-shaker-strength"));
             setprop("/haptic/device[" ~ i ~ "]/stick-shaker/direction", getprop("/sim/gui/dialogs/force-feedback/stick-shaker-direction"));
