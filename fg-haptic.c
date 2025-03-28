@@ -77,9 +77,14 @@ typedef struct __effectParams {
 
 	float rumble_period;	// Ground rumble period, 0=disable
 
-	float x;		// Forces (pilot)
-	float y;
-	float z;
+	union  {
+		struct {
+			float x;		// Forces (pilot)
+			float y;
+			float z;
+		} d;
+		float f[3];
+	} force;
 
 	float coeff[AXES];	// Spring effect coefficients
 } effectParams;
@@ -115,7 +120,7 @@ typedef struct __hapticdevice {
 	signed char rumble_mode;
 	signed char stick_mode;
 
-	signed char pilot_axes[AXES];	// Axes mapping, -1 = not used
+	signed char pilot_axes[AXES];	// Axes mapping, -1 = not used. Pilot axis to joystick axis
 	signed char stick_axes[AXES];
 
 	signed char pilot_invert[AXES];	// 1 = non-inverted, -1 = inverted
@@ -198,16 +203,17 @@ void init_haptic(void)
 			devices[i].numEffectsPlaying = SDL_HapticNumEffectsPlaying(devices[i].device);
 
 			// Default effect parameters
-			for (int a = 0; a < devices[i].axes && a < AXES; a++) {
-				devices[i].stick_axes[a] = a;
+			// By default map aileron to X, elevator to Y and rudder to Z
+			for (int a = 0; a < devices[i].axes; a++) {
+				devices[i].stick_axes[a] = a < AXES ? a : -1;	// Only map axis that exist in the joystick
 				devices[i].stick_invert[a] = 1;
 				devices[i].pilot_invert[a] = 1;
 			}
 
 			// By default only Z axis is mapped to joystick Y in pilot forces
-			devices[i].pilot_axes[0] = -1;
-			devices[i].pilot_axes[1] = 3;
-			devices[i].pilot_axes[2] = -1;
+			devices[i].pilot_axes[0] = -1;	// Pilot X (sideways) to nowhere
+			devices[i].pilot_axes[1] = -1;	// Pilot Y (front to back) to nowhere
+			devices[i].pilot_axes[2] = 1;	// Pilot Z (up and down) to joystick Y
 
 			devices[i].autocenter = 0.0;
 			devices[i].gain = 1.0;
@@ -251,7 +257,7 @@ void send_devices(void)
 		if (devices[i].supported & SDL_HAPTIC_CONSTANT) {
 			// Constant force -> pilot G forces and aileron loading
 			// Currently support 3 axis only
-			for (int x = 0; x < devices[i].axes && x < AXES; x++) {
+			for (int x = 0; x < AXES; x++) {
 				fgfswrite(telnet_sock, "set /haptic/device[%d]/pilot/%c %d", i, axes[x], devices[i].pilot_axes[x] + (devices[i].pilot_invert[x] < 0 ? AXES : 0));
 				fgfswrite(telnet_sock, "set /haptic/device[%d]/stick-force/%c %d", i, axes[x], devices[i].stick_axes[x] + (devices[i].stick_invert[x] < 0 ? AXES : 0));
 			}
@@ -404,7 +410,7 @@ void read_devices(void)
 				}
 			}
 
-			for (int x = 0; x < devices[i].axes && x < AXES; x++) {
+			for (int x = 0; x < AXES; x++) {
 				fgfswrite(telnet_sock, "get /haptic/device[%d]/pilot/%c", i, axes[x]);
 				p = fgfsread(telnet_sock, READ_TIMEOUT);
 				if (p) {
@@ -417,7 +423,7 @@ void read_devices(void)
 
 						devices[i].pilot_axes[x] = idata;
 					}
-					printf("Pilot force axis (joystick) %c: (sim) %c %s\n", axes[x], axes[devices[i].pilot_axes[x]], devices[i].pilot_invert[x]>0?"":"inv");
+					printf("Pilot force axis (sim) %c: (joystick) %c %s\n", axes[x], axes[devices[i].pilot_axes[x]], devices[i].pilot_invert[x]>0?"":"inv");
 				}
 
 				fgfswrite(telnet_sock, "get /haptic/device[%d]/stick-force/%c", i, axes[x]);
@@ -431,7 +437,7 @@ void read_devices(void)
 						} else devices[i].stick_invert[x] = 1;
 						devices[i].stick_axes[x] = idata;
 					}
-					printf("Stick force axis (joystick) %c: (sim) %c %s\n", axes[x], axes[devices[i].stick_axes[x]], devices[i].stick_invert[x]>0?"":"inv");
+					printf("Stick force axis (sim) %c: (joystick) %c %s\n", axes[x], axes[devices[i].stick_axes[x]], devices[i].stick_invert[x]>0?"":"inv");
 				}
 			}
 		}
@@ -1006,33 +1012,28 @@ int main(int argc, char **argv)
 			// Constant forces (stick forces, pilot G forces
 			if ((devices[i].supported & SDL_HAPTIC_CONSTANT)) {
 				// Pilot forces
-				if (devices[i].pilot_axes[0] >= 0)
-					devices[i].params.x = new_params.pilot[devices[i].pilot_axes[0]] * devices[i].pilot_gain * devices[i].pilot_invert[0];
-				if (devices[i].pilot_axes[1] >= 0)
-					devices[i].params.y = new_params.pilot[devices[i].pilot_axes[1]] * devices[i].pilot_gain * devices[i].pilot_invert[1];
-				if (devices[i].pilot_axes[2] >= 0)
-					devices[i].params.z = new_params.pilot[devices[i].pilot_axes[2]] * devices[i].pilot_gain * devices[i].pilot_invert[2];
+				for(int ax = 0; ax < AXES; ax++) {
+					if (devices[i].pilot_axes[ax] >= 0 && devices[i].pilot_axes[ax] < devices[i].axes)
+						devices[i].params.force.f[devices[i].pilot_axes[ax]] += new_params.pilot[ax] * devices[i].pilot_gain * devices[i].pilot_invert[ax];
+				}
 
 				if (devices[i].stick_mode == MODE_ALTERNATE) {
 					// Stick forces with axis mapping
-					if (devices[i].stick_axes[0] >= 0)
-						devices[i].params.x += new_params.stick[devices[i].stick_axes[0]] * devices[i].stick_gain * devices[i].stick_invert[0];
-					if (devices[i].stick_axes[1] >= 0)
-						devices[i].params.y += new_params.stick[devices[i].stick_axes[1]] * devices[i].stick_gain * devices[i].stick_invert[1];
-					if (devices[i].stick_axes[2] >= 0)
-						devices[i].params.z += new_params.stick[devices[i].stick_axes[2]] * devices[i].stick_gain * devices[i].stick_invert[2];
+					for(int ax = 0; ax < AXES; ax++) {
+						if (devices[i].stick_axes[ax] >= 0 && devices[i].stick_axes[ax] < devices[i].axes)
+							devices[i].params.force.f[devices[i].stick_axes[ax]] += new_params.stick[ax] * devices[i].stick_gain * devices[i].stick_invert[ax];
+					}
 				}
 
-				devices[i].params.x *= 32760.0;
-				devices[i].params.y *= 32760.0;
-				devices[i].params.z *= 32760.0;
+				for(int ax = 0; ax < AXES; ax++)
+					devices[i].params.force.f[ax] *= 32760.0;
 
 				// Low pass filter
 				float g1 = ((float)dt / (devices[i].lowpass + dt));
 				float g2 = (devices[i].lowpass / (devices[i].lowpass + dt));
-				devices[i].params.x = devices[i].params.x * g1 + oldParams[i].x * g2;
-				devices[i].params.y = devices[i].params.y * g1 + oldParams[i].y * g2;
-				devices[i].params.z = devices[i].params.z * g1 + oldParams[i].z * g2;
+				for(int ax = 0; ax < AXES; ax++)
+					devices[i].params.force.f[ax] = devices[i].params.force.f[ax] * g1 + oldParams[i].force.f[ax] * g2;
+
 
 				// Add ground rumble in alternate mode
 				float rumble = 0.0;
@@ -1047,20 +1048,21 @@ int main(int argc, char **argv)
 				// Apply the force
 				if (devices[i].effectId[CONST_X] != -1) {
 					devices[i].effect[CONST_X].constant.level =
-					    (signed short)clamp(devices[i].params.x, -32760.0, 32760.0);
+					    (signed short)clamp(devices[i].params.force.d.x, -32760.0, 32760.0);
 					reload_effect(&devices[i], &devices[i].effect[CONST_X], &devices[i].effectId[CONST_X], start_effects);
 				}
 				if (devices[i].effectId[CONST_Y] != -1) {
 					devices[i].effect[CONST_Y].constant.level =
-					    (signed short)clamp(devices[i].params.y + rumble, -32760.0, 32760.0);
+					    (signed short)clamp(devices[i].params.force.d.y + rumble, -32760.0, 32760.0);
 					reload_effect(&devices[i], &devices[i].effect[CONST_Y], &devices[i].effectId[CONST_Y], start_effects);
 				}
 				if (devices[i].effectId[CONST_Z] != -1) {
 					devices[i].effect[CONST_Z].constant.level =
-					    (signed short)clamp(devices[i].params.z, -32760.0, 32760.0);
+					    (signed short)clamp(devices[i].params.force.d.z, -32760.0, 32760.0);
 					reload_effect(&devices[i], &devices[i].effect[CONST_Z], &devices[i].effectId[CONST_Z], start_effects);
 				}
 				//printf("dt: %d  X: %.6f  Y: %.6f\n", (unsigned int)dt, devices[i].params.x, devices[i].params.y);
+				//printf("dt: %d  X: %d  Y: %d\n", (unsigned int)dt,  devices[i].effect[CONST_X].constant.level, devices[i].effect[CONST_Y].constant.level);
 			}
 
 			// Spring effect if stick forces in normal mode
@@ -1071,23 +1073,28 @@ int main(int argc, char **argv)
 
 				// Set center point according to trim
 				for(int j=0; j<AXES; j++) {
-					devices[i].effect[SPRING].condition.center[j] = (signed short)clamp(new_params.trim[devices[i].stick_axes[j]]*32767, -32760, 32760);
+					int ax = devices[i].stick_axes[j];
+
+					if (ax < 0 || ax >= AXES)
+						continue;
+
+					devices[i].effect[SPRING].condition.center[ax] = (signed short)clamp(new_params.trim[j]*32767, -32760, 32760);
 
 					// Calculate the new coefficient
-					devices[i].params.coeff[j] = -new_params.stick[devices[i].stick_axes[j]] * devices[i].stick_gain * devices[i].stick_invert[j];
+					devices[i].params.coeff[ax] = -new_params.stick[j] * devices[i].stick_gain * devices[i].stick_invert[j];
 
 					// Apply low pass filter
-					devices[i].params.coeff[j] = devices[i].params.coeff[j] * g1 + oldParams[i].coeff[j] * g2;
+					devices[i].params.coeff[ax] = devices[i].params.coeff[ax] * g1 + oldParams[i].coeff[ax] * g2;
 
-					// Note! the axis are inverted when they come from flightgear, so invert here again
-					devices[i].effect[SPRING].condition.left_coeff[j] =
-						(signed short)clamp(devices[i].params.coeff[j] * 32767, -32760, 32760);
-					devices[i].effect[SPRING].condition.right_coeff[j] =
-						(signed short)clamp(devices[i].params.coeff[j] * 32767, -32760, 32760);
+					// Note! the axis are inverted when they come from flightgear, so invert here again (???)
+					devices[i].effect[SPRING].condition.left_coeff[ax] =
+						(signed short)clamp(devices[i].params.coeff[ax] * 32767, -32760, 32760);
+					devices[i].effect[SPRING].condition.right_coeff[ax] =
+						(signed short)clamp(devices[i].params.coeff[ax] * 32767, -32760, 32760);
 				}
 
 				reload_effect(&devices[i], &devices[i].effect[SPRING], &devices[i].effectId[SPRING], start_effects);
-				//printf("dt: %d  X: %.6f  Y: %.6f\n", (unsigned int)dt,  devices[i].params.coeff[0], devices[i].params.coeff[1]);
+				//printf("dt: %d  X: %d  Y: %d\n", (unsigned int)dt,  devices[i].effect[SPRING].condition.left_coeff[0], devices[i].effect[SPRING].condition.left_coeff[1]);
 			}
 
 

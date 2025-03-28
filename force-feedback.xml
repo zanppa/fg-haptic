@@ -229,20 +229,20 @@
         <group>
           <layout>hbox</layout>
 
-          <!-- X -->
+          <!-- Aileron, joystick X axis -->
           <group>
             <layout>vbox</layout>
-            <text><label>X</label><enable><property>/sim/gui/dialogs/force-feedback/control-surface-enable</property></enable></text>
+            <text><label>Aileron</label><enable><property>/sim/gui/dialogs/force-feedback/control-surface-enable</property></enable></text>
             <combo>
               <name>control-surface-x</name>
               <property>/sim/gui/dialogs/force-feedback/control-surface-x</property>
               <value>None</value>
-              <value>Aileron</value>
-              <value>-Aileron</value>
-              <value>Elevator</value>
-              <value>-Elevator</value>
-              <value>Rudder</value>
-              <value>-Rudder</value>
+              <value>X</value>
+              <value>-X</value>
+              <value>Y</value>
+              <value>-Y</value>
+              <value>Z</value>
+              <value>-Z</value>
               <binding>
                 <command>dialog-apply</command>
 <!--                <object-name>control-surface-x</object-name> -->
@@ -256,20 +256,20 @@
             </combo>
           </group>
 
-          <!-- Y -->
+          <!-- Elevator, joystick Y axis -->
           <group>
             <layout>vbox</layout>
-            <text><label>Y</label><enable><property>/sim/gui/dialogs/force-feedback/control-surface-enable</property></enable></text>
+            <text><label>Elevator</label><enable><property>/sim/gui/dialogs/force-feedback/control-surface-enable</property></enable></text>
             <combo>
               <name>control-surface-y</name>
               <property>/sim/gui/dialogs/force-feedback/control-surface-y</property>
               <value>None</value>
-              <value>Aileron</value>
-              <value>-Aileron</value>
-              <value>Elevator</value>
-              <value>-Elevator</value> 
-              <value>Rudder</value>
-              <value>-Rudder</value>
+              <value>X</value>
+              <value>-X</value>
+              <value>Y</value>
+              <value>-Y</value> 
+              <value>>Z</value>
+              <value>-Z</value>
               <binding>
                 <command>dialog-apply</command>
 <!--                <object-name>control-surface-y</object-name> -->
@@ -283,20 +283,20 @@
             </combo>
           </group>
 
-          <!-- Z -->
+          <!-- Rudder, joystick Z axis -->
           <group>
             <layout>vbox</layout>
-            <text><label>Z</label><enable><property>/sim/gui/dialogs/force-feedback/control-surface-enable</property></enable></text>
+            <text><label>Rudder</label><enable><property>/sim/gui/dialogs/force-feedback/control-surface-enable</property></enable></text>
             <combo>
               <name>control-surface-z</name>
               <property>/sim/gui/dialogs/force-feedback/control-surface-z</property>
               <value>None</value>
-              <value>Aileron</value>
-              <value>-Aileron</value>
-              <value>Elevator</value>
-              <value>-Elevator</value>
-              <value>Rudder</value>
-              <value>-Rudder</value>
+              <value>x</value>
+              <value>-X</value>
+              <value>Y</value>
+              <value>-Y</value>
+              <value>Z</value>
+              <value>-Z</value>
               <binding>
                 <command>dialog-apply</command>
 <!--                <object-name>control-surface-z</object-name> -->
@@ -325,6 +325,17 @@
           <text><label>Pilot G forces</label><enable><property>/sim/gui/dialogs/force-feedback/pilot-g-enable</property></enable></text>
           <hrule><stretch>1</stretch></hrule>
         </group>
+
+        <!-- Enable checkbox -->
+<!--
+        <checkbox>
+            <label>Enable</label>
+            <property>/sim/gui/dialogs/force-feedback/pilot-g-used</property>
+            <binding>
+                <command>dialog-apply</command>
+            </binding>
+        </checkbox>
+-->
 
         <!-- Slider -->
         <group>
@@ -364,7 +375,7 @@
           <!-- X -->
           <group>
             <layout>vbox</layout>
-            <text><label>X</label><enable><property>/sim/gui/dialogs/force-feedback/pilot-g-enable</property></enable></text>
+            <text><label>Pilot X</label><enable><property>/sim/gui/dialogs/force-feedback/pilot-g-enable</property></enable></text>
             <combo>
               <name>pilot-g-x</name>
               <property>/sim/gui/dialogs/force-feedback/pilot-g-x</property>
@@ -391,7 +402,7 @@
           <!-- Y -->
           <group>
             <layout>vbox</layout>
-            <text><label>Y</label><enable><property>/sim/gui/dialogs/force-feedback/pilot-g-enable</property></enable></text>
+            <text><label>Pilot Y</label><enable><property>/sim/gui/dialogs/force-feedback/pilot-g-enable</property></enable></text>
             <combo>
               <name>pilot-g-y</name>
               <property>/sim/gui/dialogs/force-feedback/pilot-g-y</property>
@@ -418,7 +429,7 @@
           <!-- Z -->
           <group>
             <layout>vbox</layout>
-            <text><label>Z</label><enable><property>/sim/gui/dialogs/force-feedback/pilot-g-enable</property></enable></text>
+            <text><label>Pilot Z</label><enable><property>/sim/gui/dialogs/force-feedback/pilot-g-enable</property></enable></text>
             <combo>
               <name>pilot-g-z</name>
               <property>/sim/gui/dialogs/force-feedback/pilot-g-z</property>
@@ -733,8 +744,8 @@
       };
 
       # Stick and pilot axis mapping
-      var stick_axis = { None:-1, Aileron:0, Elevator:1, Rudder:2, "-Aileron":3, "-Elevator":4, "-Rudder":5};
-      var pilot_axis = { None:-1, X:0, Y:1, Z:2, "-X":3, "-Y":4, "-Z":5 };
+      var stick_axis = { "None":-1, "X":0, "Y":1, "Z":2, "-X":3, "-Y":4, "-Z":5};
+      var pilot_axis = { "None":-1, "X":0, "Y":1, "Z":2, "-X":3, "-Y":4, "-Z":5 };
 
       var getAxisNumber = func(node, values) {
         var selected = getprop(node);
@@ -833,6 +844,30 @@
 
         # TODO: Should probably use gui.enable_widget(...) instead of enable-properties...
 
+        # Disable (remove) non existing axis from combo boxes
+        var stick_axes = getprop("/haptic/device[" ~ dev ~ "]/axes");
+        if(stick_axes != nil) {
+          var boxname = ["control-surface-x", "control-surface-y", "control-surface-z", "pilot-g-x", "pilot-g-y", "pilot-g-z"];
+          foreach(boxelement; boxname) {
+            var combo = gui.findElementByName(cmdarg(), boxelement);
+            if(combo == nil) continue;
+            combo.removeChildren("value");
+            if(stick_axes > 0)  {
+                combo.addChild("value").setValue("X");
+                combo.addChild("value").setValue("-X");
+            }
+            if(stick_axes > 1) {
+                combo.addChild("value").setValue("Y");
+                combo.addChild("value").setValue("-Y");
+            }
+            if(stick_axes > 2) {
+                combo.addChild("value").setValue("Z");
+                combo.addChild("value").setValue("-Z");
+            }
+          }
+        }
+
+
         # Force trimming
         effect = getprop("/haptic/enable-force-trim-aileron");
         if(effect == nil) effect = "false";
@@ -923,18 +958,18 @@
 
         # Axis bindings
         effect = getprop("/haptic/device[" ~ dev ~ "]/stick-force/x");
-        if(effect == nil) setprop("/sim/gui/dialogs/force-feedback/control-surface-x", "-Aileron");
+        if(effect == nil) setprop("/sim/gui/dialogs/force-feedback/control-surface-x", "-X");
         else setprop("/sim/gui/dialogs/force-feedback/control-surface-x", getAxisName(effect, stick_axis));
 
         if(axes != nil and axes > 1) {
           effect = getprop("/haptic/device[" ~ dev ~ "]/stick-force/y");
-          if(effect == nil) setprop("/sim/gui/dialogs/force-feedback/control-surface-y", "-Elevator");
+          if(effect == nil) setprop("/sim/gui/dialogs/force-feedback/control-surface-y", "-Y");
           else setprop("/sim/gui/dialogs/force-feedback/control-surface-y", getAxisName(effect, stick_axis));
         } else setprop("/sim/gui/dialogs/force-feedback/control-surface-y", "None");
 
         if(axes != nil and axes > 2) {
           effect = getprop("/haptic/device[" ~ dev ~ "]/stick-force/z");
-          if(effect == nil) setprop("/sim/gui/dialogs/force-feedback/control-surface-z", "Rudder");
+          if(effect == nil) setprop("/sim/gui/dialogs/force-feedback/control-surface-z", "Z");
           else setprop("/sim/gui/dialogs/force-feedback/control-surface-z", getAxisName(effect, stick_axis));
         } else setprop("/sim/gui/dialogs/force-feedback/control-surface-z", "None");
 
@@ -987,23 +1022,6 @@
         }
 		
         # TODO: Set combo box default/set values
-
-        # Disable non existing axis
-        effect = getprop("/haptic/device[" ~ dev ~ "]/axes");
-        if(effect != nil) {
-          if(effect < 3) {  # Disable Z axis
-            gui.enable_widgets(cmdarg(), "control-surface-z", 0);  # TODO: Looks ugly...
-            gui.enable_widgets(cmdarg(), "pilot-g-z", 0);
-          }
-          if(effect < 2) { # Disable also Y axis
-            gui.enable_widgets(cmdarg(), "control-surface-y", 0);
-            gui.enable_widgets(cmdarg(), "pilot-g-y", 0);
-          }
-          if(effect < 1) { # 0 Axis... rumble or something
-            gui.enable_widgets(cmdarg(), "control-surface-x", 0);
-            gui.enable_widgets(cmdarg(), "pilot-g-x", 0);
-          }
-        }
 
         gui.dialog_update("force-feedback");
       };
