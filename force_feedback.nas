@@ -295,22 +295,28 @@ var update_forces = func {
 ###
 # Force trim functions
 controls.aileronTrim = func(rate) {
-  if(!enable_force_trim_aileron.getValue())
+  if(!enable_force_trim_aileron.getValue()) {
     origAileronTrim(rate);
-  else
+    setprop("/haptic/force-trim-aileron", 0.0);
+  } else {
     controls.slewProp("/haptic/force-trim-aileron", trim_rate*rate);
+  }
 };
 controls.elevatorTrim = func(rate) {
-  if(!enable_force_trim_elevator.getValue())
+  if(!enable_force_trim_elevator.getValue()) {
     origElevatorTrim(rate);
-  else
+    setprop("/haptic/force-trim-elevator", 0.0);
+  } else {
     controls.slewProp("/haptic/force-trim-elevator", trim_rate*rate);
+  }
 };
 controls.rudderTrim = func(rate) {
-  if(!enable_force_trim_rudder.getValue())
+  if(!enable_force_trim_rudder.getValue()) {
     origRudderTrim(rate);
-  else
+    setprop("/haptic/force-trim-rudder", 0.0);
+  } else {
     controls.slewProp("/haptic/force-trim-rudder", trim_rate*rate);
+  }
 };
 
 
